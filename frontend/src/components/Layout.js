@@ -71,8 +71,8 @@ const Layout = () => {
               <Wrench className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="font-bold text-lg font-[Chivo] tracking-tight">Quincaillerie</h1>
-              <p className="text-xs text-slate-400">Pro</p>
+              <h1 className="font-bold text-lg font-[Chivo] tracking-tight">Gora MBAYE</h1>
+              <p className="text-xs text-slate-400">Quincaillerie</p>
             </div>
           </div>
         </div>
