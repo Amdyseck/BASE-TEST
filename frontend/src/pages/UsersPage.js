@@ -2,7 +2,16 @@ import { useState, useEffect } from "react";
 import api from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "../components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -19,12 +28,20 @@ import {
   TableRow,
 } from "../components/ui/table";
 import { toast } from "sonner";
-import { Users, Shield, Trash2 } from "lucide-react";
+import { Users, Shield, Trash2, Plus, Eye, EyeOff } from "lucide-react";
 
 const UsersPage = () => {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    password: "",
+    role: "vendeur",
+  });
 
   useEffect(() => {
     fetchUsers();
@@ -39,6 +56,29 @@ const UsersPage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCreateUser = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post("/auth/register", formData);
+      toast.success("Utilisateur créé avec succès");
+      setIsDialogOpen(false);
+      resetForm();
+      fetchUsers();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Erreur lors de la création");
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      email: "",
+      password: "",
+      role: "vendeur",
+    });
+    setShowPassword(false);
   };
 
   const handleRoleChange = async (userId, newRole) => {
@@ -97,6 +137,94 @@ const UsersPage = () => {
           </h1>
           <p className="text-slate-500 mt-1">Gérez les accès et les rôles</p>
         </div>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => {
+          setIsDialogOpen(open);
+          if (!open) resetForm();
+        }}>
+          <DialogTrigger asChild>
+            <Button className="btn-primary" data-testid="add-user-btn">
+              <Plus className="w-4 h-4 mr-2" />
+              Nouvel utilisateur
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="font-[Chivo]">Créer un utilisateur</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleCreateUser} className="space-y-4">
+              <div className="space-y-2">
+                <Label className="overline">Nom complet</Label>
+                <Input
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                  className="rounded-sm"
+                  data-testid="input-user-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="overline">Email</Label>
+                <Input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  required
+                  className="rounded-sm"
+                  data-testid="input-user-email"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="overline">Mot de passe</Label>
+                <div className="relative">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    required
+                    className="rounded-sm pr-10"
+                    data-testid="input-user-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="overline">Rôle</Label>
+                <Select
+                  value={formData.role}
+                  onValueChange={(value) => setFormData({ ...formData, role: value })}
+                >
+                  <SelectTrigger className="rounded-sm" data-testid="select-user-role">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Administrateur</SelectItem>
+                    <SelectItem value="vendeur">Vendeur</SelectItem>
+                    <SelectItem value="caissier">Caissier</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex justify-end gap-3 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsDialogOpen(false)}
+                  className="rounded-sm"
+                >
+                  Annuler
+                </Button>
+                <Button type="submit" className="btn-primary" data-testid="save-user-btn">
+                  Créer
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Stats */}
@@ -213,6 +341,11 @@ const UsersPage = () => {
           </TableBody>
         </Table>
       </Card>
+      
+      {/* Footer */}
+      <div className="text-center text-xs text-slate-400 mt-8">
+        <p>Développé par Amdy SECK - 77 571 93 98</p>
+      </div>
     </div>
   );
 };
