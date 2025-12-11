@@ -1,0 +1,174 @@
+{
+  "design_system": {
+    "name": "The Modern Workshop",
+    "description": "A precision-engineered design system for hardware management. Combines the reliability of industrial tools with the clarity of Swiss typography. Functional, sturdy, and high-contrast.",
+    "identity": {
+      "archetype": "Swiss & High-Contrast (Industrial Variant)",
+      "emotion": "Reliability, Precision, Order",
+      "key_principles": [
+        "Data is the Hero: Inventory numbers must be monospaced and high-contrast.",
+        "Grid Borders: Visible structure, like a blueprint or shelving unit.",
+        "Safety Colors: Use Orange only for alerts/actions, Blue for structure.",
+        "Dense & Direct: No unnecessary whitespace in data tables."
+      ]
+    },
+    "typography": {
+      "font_family": {
+        "headings": "Chivo, sans-serif",
+        "body": "Inter, sans-serif",
+        "mono": "JetBrains Mono, monospace"
+      },
+      "imports": [
+        "@import url('https://fonts.googleapis.com/css2?family=Chivo:wght@300;400;700;900&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');"
+      ],
+      "rules": [
+        "Headings (h1-h3) must use 'Chivo' with 'tracking-tight' and 'font-bold'.",
+        "All prices, stock counts, and SKUs must use 'JetBrains Mono'.",
+        "Labels and overlines must be uppercase, 'text-xs', 'tracking-widest', and 'font-medium'."
+      ]
+    },
+    "colors": {
+      "palette": {
+        "primary": {
+          "DEFAULT": "#0F172A",
+          "foreground": "#F8FAFC",
+          "description": "Slate 900 - Deep, almost black blue. Used for Sidebar, Primary Buttons, Text."
+        },
+        "secondary": {
+          "DEFAULT": "#F1F5F9",
+          "foreground": "#0F172A",
+          "description": "Slate 100 - Used for secondary buttons, card backgrounds."
+        },
+        "accent": {
+          "DEFAULT": "#F97316",
+          "foreground": "#FFFFFF",
+          "description": "Orange 500 - Safety Orange. Used for 'Low Stock' alerts, 'Add to Cart' actions."
+        },
+        "background": {
+          "DEFAULT": "#F8FAFC",
+          "description": "Slate 50 - Paper white. Not clinical white."
+        },
+        "surface": {
+          "DEFAULT": "#FFFFFF",
+          "description": "Pure white for cards and tables."
+        },
+        "border": {
+          "DEFAULT": "#E2E8F0",
+          "description": "Slate 200 - Crisp, visible borders."
+        },
+        "muted": {
+          "DEFAULT": "#64748B",
+          "description": "Slate 500 - Secondary text."
+        }
+      },
+      "usage_rules": [
+        "Never use gradients for backgrounds. Use solid colors or subtle noise textures.",
+        "Use 'Safety Orange' sparingly. It should scream 'Attention'.",
+        "Borders are essential. Use 'border-slate-200' to define structure."
+      ]
+    },
+    "layout": {
+      "grid_system": {
+        "dashboard": "grid-cols-1 md:grid-cols-4 gap-4",
+        "marketing": "grid-cols-1 md:grid-cols-12 gap-8"
+      },
+      "spacing": {
+        "container_padding": "p-6 md:p-8",
+        "element_gap": "gap-4"
+      },
+      "strategies": [
+        "The 'Control Room' Grid: Dense, data-heavy layouts for the dashboard.",
+        "Sidebar Navigation: Fixed width (240px), dark theme ('bg-slate-900').",
+        "Cardless Tables: Use 'border-b' for rows, remove outer card borders for a cleaner look."
+      ]
+    },
+    "components": {
+      "buttons": {
+        "style": "rounded-sm font-medium tracking-wide uppercase text-xs",
+        "variants": {
+          "primary": "bg-slate-900 text-white hover:bg-slate-800 shadow-sm",
+          "secondary": "bg-white border border-slate-200 text-slate-900 hover:bg-slate-50",
+          "destructive": "bg-red-600 text-white hover:bg-red-700",
+          "accent": "bg-orange-500 text-white hover:bg-orange-600"
+        }
+      },
+      "cards": {
+        "style": "bg-white border border-slate-200 rounded-sm shadow-sm",
+        "header": "border-b border-slate-100 p-4",
+        "content": "p-4"
+      },
+      "inputs": {
+        "style": "rounded-sm border-slate-200 focus:ring-2 focus:ring-slate-900 focus:border-transparent font-mono text-sm"
+      },
+      "badges": {
+        "style": "rounded-full px-2 py-0.5 text-xs font-mono font-medium",
+        "variants": {
+          "success": "bg-green-100 text-green-700",
+          "warning": "bg-orange-100 text-orange-700",
+          "error": "bg-red-100 text-red-700",
+          "neutral": "bg-slate-100 text-slate-700"
+        }
+      }
+    },
+    "visual_enhancers": {
+      "textures": [
+        "Grid Pattern: 'bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]' for dashboard background."
+      ],
+      "shadows": {
+        "card": "shadow-[0_1px_3px_0_rgba(0,0,0,0.1),0_1px_2px_-1px_rgba(0,0,0,0.1)]",
+        "dropdown": "shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),0_4px_6px_-4px_rgba(0,0,0,0.1)]"
+      },
+      "borders": "1px solid #E2E8F0 (Slate 200)"
+    },
+    "media": {
+      "image_urls": {
+        "login_background": {
+          "url": "https://images.unsplash.com/photo-1661338148448-c12887abcd47?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzR8MHwxfHNlYXJjaHwzfHxtb2Rlcm4lMjBoYXJkd2FyZSUyMHN0b3JlJTIwaW50ZXJpb3IlMjBzaGVsdmVzJTIwdG9vbHN8ZW58MHx8fHwxNzY1NDcwODg1fDA&ixlib=rb-4.1.0&q=85",
+          "description": "Wall with tools - Use for Login/Register split screen background.",
+          "category": "background"
+        },
+        "dashboard_texture": {
+          "url": "https://images.unsplash.com/photo-1618373012585-ae012fc350e8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHw0fHxjb25zdHJ1Y3Rpb24lMjB0b29scyUyMGZsYXQlMjBsYXklMjBhZXN0aGV0aWN8ZW58MHx8fHwxNzY1NDcwODg1fDA&ixlib=rb-4.1.0&q=85",
+          "description": "Tools on wood - Use for 'Welcome' widget or promo banner.",
+          "category": "texture"
+        },
+        "user_avatar_placeholder": {
+          "url": "https://images.pexels.com/photos/4484078/pexels-photo-4484078.jpeg",
+          "description": "Warehouse worker - Default avatar for staff.",
+          "category": "avatar"
+        },
+        "product_placeholder": {
+          "url": "https://images.unsplash.com/photo-1628002580365-f3c0a322d577?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwxfHxjb25zdHJ1Y3Rpb24lMjB0b29scyUyMGZsYXQlMjBsYXklMjBhZXN0aGV0aWN8ZW58MHx8fHwxNzY1NDcwODg5fDA&ixlib=rb-4.1.0&q=85",
+          "description": "Hammer/Tools - Default product image.",
+          "category": "product"
+        }
+      },
+      "icons": "Use 'lucide-react' for all UI icons. Use 'Package', 'Wrench', 'Hammer', 'ShoppingCart', 'Users', 'BarChart3' heavily."
+    },
+    "accessibility": {
+      "contrast": "Ensure all text meets WCAG AA (4.5:1). Use Slate 900 on Slate 50/100.",
+      "focus_states": "Visible focus rings (ring-2 ring-slate-900) are mandatory for keyboard navigation.",
+      "aria_labels": "All icon-only buttons must have aria-label."
+    },
+    "instructions_to_main_agent": {
+      "general": "You are building a professional tool, not a toy. Prioritize density and information hierarchy over whitespace. Use the 'Grid Pattern' background for the main dashboard area to give it a technical feel.",
+      "layout_implementation": "Use a Sidebar Layout with a fixed left sidebar (w-64) and a scrollable main content area. The main content area should have the 'Grid Pattern' background.",
+      "component_usage": "Use Shadcn UI components but override the rounded corners to 'rounded-sm' or 'rounded-md' to match the industrial aesthetic. Do not use 'rounded-xl' or 'rounded-2xl'.",
+      "charts": "Use 'recharts' with the custom color palette (Slate 900 for primary data, Orange 500 for alerts).",
+      "tables": "Tables are the heart of this app. Make them dense ('p-2' cells) and use 'JetBrains Mono' for all numerical data (Price, Stock, SKU)."
+    },
+    "universal_guidelines": {
+      "do_not": [
+        "Do not use gradients for buttons or backgrounds.",
+        "Do not use 'Inter' for headings (Use 'Chivo').",
+        "Do not use rounded-full for buttons (except badges).",
+        "Do not center text in tables (except status badges)."
+      ],
+      "must_do": [
+        "Must use 'data-testid' for all interactive elements.",
+        "Must use 'sonner' for toast notifications.",
+        "Must implement a responsive sidebar that collapses on mobile."
+      ]
+    }
+  }
+}
