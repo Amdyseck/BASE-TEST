@@ -92,7 +92,7 @@ const InvoicePage = () => {
                 <Wrench className="w-7 h-7 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold font-[Chivo] text-slate-900">Quincaillerie Pro</h1>
+                <h1 className="text-xl font-bold font-[Chivo] text-slate-900">Quincaillerie Gora MBAYE</h1>
                 <p className="text-sm text-slate-500">Votre partenaire en quincaillerie</p>
               </div>
             </div>
