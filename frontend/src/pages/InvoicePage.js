@@ -188,7 +188,8 @@ const InvoicePage = () => {
         {/* Footer */}
         <div className="mt-8 pt-6 border-t border-slate-200 text-center text-sm text-slate-500">
           <p>Merci pour votre achat!</p>
-          <p className="mt-1">Quincaillerie Pro - Votre satisfaction est notre priorité</p>
+          <p className="mt-1">Quincaillerie Gora MBAYE - Votre satisfaction est notre priorité</p>
+          <p className="mt-2 text-xs">Développé par Amdy SECK - 77 571 93 98</p>
         </div>
       </div>
     </div>
