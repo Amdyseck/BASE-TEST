@@ -9,17 +9,14 @@ import { toast } from "sonner";
 import { Wrench, Eye, EyeOff } from "lucide-react";
 
 const LoginPage = () => {
-  const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
-    name: "",
     email: "",
     password: "",
-    role: "vendeur",
   });
 
-  const { login, register } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -27,13 +24,8 @@ const LoginPage = () => {
     setLoading(true);
 
     try {
-      if (isLogin) {
-        await login(formData.email, formData.password);
-        toast.success("Connexion réussie");
-      } else {
-        await register(formData.name, formData.email, formData.password, formData.role);
-        toast.success("Compte créé avec succès");
-      }
+      await login(formData.email, formData.password);
+      toast.success("Connexion réussie");
       navigate("/dashboard");
     } catch (error) {
       toast.error(error.response?.data?.detail || "Une erreur est survenue");
@@ -57,7 +49,7 @@ const LoginPage = () => {
               <Wrench className="w-12 h-12" />
             </div>
             <h1 className="text-4xl font-bold font-[Chivo] tracking-tight mb-4">
-              Quincaillerie Pro
+              Quincaillerie Gora MBAYE
             </h1>
             <p className="text-slate-300 max-w-md">
               Solution complète de gestion pour votre quincaillerie. 
@@ -77,39 +69,21 @@ const LoginPage = () => {
             </div>
             <div>
               <h1 className="font-bold text-xl font-[Chivo] tracking-tight text-slate-900">
-                Quincaillerie Pro
+                Quincaillerie Gora MBAYE
               </h1>
             </div>
           </div>
 
           <div className="mb-8">
             <h2 className="text-2xl font-bold font-[Chivo] tracking-tight text-slate-900">
-              {isLogin ? "Connexion" : "Créer un compte"}
+              Connexion
             </h2>
             <p className="text-slate-500 mt-2">
-              {isLogin
-                ? "Connectez-vous pour accéder à votre espace"
-                : "Créez votre compte pour commencer"}
+              Connectez-vous pour accéder à votre espace
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {!isLogin && (
-              <div className="space-y-2">
-                <Label htmlFor="name" className="overline">Nom complet</Label>
-                <Input
-                  id="name"
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Jean Dupont"
-                  required={!isLogin}
-                  className="rounded-sm"
-                  data-testid="input-name"
-                />
-              </div>
-            )}
-
             <div className="space-y-2">
               <Label htmlFor="email" className="overline">Email</Label>
               <Input
@@ -147,25 +121,6 @@ const LoginPage = () => {
               </div>
             </div>
 
-            {!isLogin && (
-              <div className="space-y-2">
-                <Label htmlFor="role" className="overline">Rôle</Label>
-                <Select
-                  value={formData.role}
-                  onValueChange={(value) => setFormData({ ...formData, role: value })}
-                >
-                  <SelectTrigger className="rounded-sm" data-testid="select-role">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">Administrateur</SelectItem>
-                    <SelectItem value="vendeur">Vendeur</SelectItem>
-                    <SelectItem value="caissier">Caissier</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
             <Button
               type="submit"
               className="w-full btn-primary h-11"
@@ -174,25 +129,19 @@ const LoginPage = () => {
             >
               {loading ? (
                 <div className="spinner w-5 h-5 border-white/30 border-t-white" />
-              ) : isLogin ? (
-                "Se connecter"
               ) : (
-                "Créer le compte"
+                "Se connecter"
               )}
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
-            <button
-              type="button"
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-sm text-slate-600 hover:text-slate-900"
-              data-testid="toggle-auth-mode"
-            >
-              {isLogin
-                ? "Pas de compte ? Créer un compte"
-                : "Déjà un compte ? Se connecter"}
-            </button>
+          <div className="mt-8 pt-6 border-t border-slate-200 text-center">
+            <p className="text-xs text-slate-500">
+              Développé par Amdy SECK
+            </p>
+            <p className="text-xs text-slate-500 font-mono">
+              77 571 93 98
+            </p>
           </div>
         </div>
       </div>
