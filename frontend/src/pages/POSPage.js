@@ -152,6 +152,7 @@ const POSPage = () => {
 
     setProcessing(true);
     try {
+      const customerId = selectedCustomer && selectedCustomer !== "comptoir" ? selectedCustomer : null;
       const saleData = {
         items: cart.map(({ product_id, product_name, quantity, unit_price, total }) => ({
           product_id,
@@ -160,8 +161,8 @@ const POSPage = () => {
           unit_price,
           total,
         })),
-        customer_id: selectedCustomer || null,
-        customer_name: selectedCustomer
+        customer_id: customerId,
+        customer_name: customerId
           ? customers.find((c) => c.id === selectedCustomer)?.name
           : "Client Comptoir",
         payment_method: paymentMethod,
@@ -306,7 +307,7 @@ const POSPage = () => {
                     <SelectValue placeholder="Client comptoir" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Client comptoir</SelectItem>
+                    <SelectItem value="comptoir">Client comptoir</SelectItem>
                     {customers.map((customer) => (
                       <SelectItem key={customer.id} value={customer.id}>
                         {customer.name}
