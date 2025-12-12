@@ -40,7 +40,7 @@ const Layout = () => {
     { to: "/dashboard", icon: LayoutDashboard, label: "Tableau de bord" },
     { to: "/pos", icon: ShoppingCart, label: "Caisse" },
     { to: "/products", icon: Package, label: "Produits" },
-    { to: "/categories", icon: FolderOpen, label: "Catégories" },
+    { to: "/categories", icon: FolderOpen, label: "Familles" },
     { to: "/sales", icon: Receipt, label: "Ventes" },
     { to: "/customers", icon: Users, label: "Clients" },
     { to: "/suppliers", icon: Truck, label: "Fournisseurs" },
