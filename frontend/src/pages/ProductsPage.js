@@ -34,6 +34,7 @@ const ProductsPage = () => {
   const { isAdmin, isVendeur } = useAuth();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [depots, setDepots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -44,6 +45,7 @@ const ProductsPage = () => {
     sku: "",
     barcode: "",
     category_id: "",
+    depot_id: "",
     price: "",
     cost_price: "",
     stock: "",
