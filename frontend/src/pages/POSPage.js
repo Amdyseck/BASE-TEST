@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../lib/api";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import {
   Select,
@@ -18,10 +19,11 @@ import {
   Minus,
   Trash2,
   ShoppingCart,
-  CreditCard,
-  Banknote,
   Receipt,
   Barcode,
+  Banknote,
+  Smartphone,
+  CreditCard,
 } from "lucide-react";
 
 const POSPage = () => {
@@ -32,15 +34,15 @@ const POSPage = () => {
   const [cart, setCart] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [barcodeInput, setBarcodeInput] = useState("");
-  const [selectedCustomer, setSelectedCustomer] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [selectedCustomer, setSelectedCustomer] = useState("comptoir");
+  const [paymentMethod, setPaymentMethod] = useState("especes");
+  const [amountPaid, setAmountPaid] = useState(0);
   const [discount, setDiscount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     fetchData();
-    // Focus on barcode input
     if (barcodeInputRef.current) {
       barcodeInputRef.current.focus();
     }
@@ -70,7 +72,6 @@ const POSPage = () => {
       addToCart(response.data);
       setBarcodeInput("");
     } catch (error) {
-      // Try to find by reference
       const product = products.find(
         (p) => p.sku.toLowerCase() === barcodeInput.toLowerCase() || p.barcode === barcodeInput
       );
@@ -113,16 +114,42 @@ const POSPage = () => {
           unit_price: product.price,
           total: product.price,
           max_stock: product.stock,
+          unit: product.unit,
         },
       ]);
     }
   };
 
-  const updateQuantity = (productId, delta) => {
+  const updateQuantity = (productId, newQuantity) => {
+    const numQty = parseFloat(newQuantity) || 0;
     setCart(
       cart.map((item) => {
         if (item.product_id === productId) {
-          const newQty = Math.max(1, Math.min(item.quantity + delta, item.max_stock));
+          const qty = Math.max(0.1, Math.min(numQty, item.max_stock));
+          return { ...item, quantity: qty, total: qty * item.unit_price };
+        }
+        return item;
+      })
+    );
+  };
+
+  const incrementQuantity = (productId) => {
+    setCart(
+      cart.map((item) => {
+        if (item.product_id === productId) {
+          const newQty = Math.min(item.quantity + 1, item.max_stock);
+          return { ...item, quantity: newQty, total: newQty * item.unit_price };
+        }
+        return item;
+      })
+    );
+  };
+
+  const decrementQuantity = (productId) => {
+    setCart(
+      cart.map((item) => {
+        if (item.product_id === productId) {
+          const newQty = Math.max(0.5, item.quantity - 1);
           return { ...item, quantity: newQty, total: newQty * item.unit_price };
         }
         return item;
@@ -136,13 +163,14 @@ const POSPage = () => {
 
   const clearCart = () => {
     setCart([]);
-    setSelectedCustomer("");
+    setSelectedCustomer("comptoir");
     setDiscount(0);
+    setAmountPaid(0);
   };
 
   const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
-  const tax = subtotal * 0.18;
-  const total = subtotal + tax - discount;
+  const total = subtotal - discount;
+  const balanceDue = total - amountPaid;
 
   const handleCheckout = async () => {
     if (cart.length === 0) {
@@ -166,17 +194,17 @@ const POSPage = () => {
           ? customers.find((c) => c.id === selectedCustomer)?.name
           : "Client Comptoir",
         payment_method: paymentMethod,
+        amount_paid: amountPaid,
         discount: discount,
       };
 
       const response = await api.post("/sales", saleData);
       toast.success(`Vente enregistrée: ${response.data.invoice_number}`);
       
-      // Navigate to invoice
       navigate(`/invoice/${response.data.id}`);
       
       clearCart();
-      fetchData(); // Refresh products to update stock
+      fetchData();
     } catch (error) {
       toast.error(error.response?.data?.detail || "Erreur lors de la vente");
     } finally {
@@ -198,6 +226,13 @@ const POSPage = () => {
       (p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.sku.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  const paymentMethods = [
+    { value: "especes", label: "Espèces", icon: Banknote },
+    { value: "wave", label: "Wave", icon: Smartphone },
+    { value: "orange_money", label: "Orange Money", icon: Smartphone },
+    { value: "cheque", label: "Chèque", icon: CreditCard },
+  ];
 
   if (loading) {
     return (
@@ -280,7 +315,7 @@ const POSPage = () => {
                             : "bg-green-100 text-green-700"
                         }`}
                       >
-                        {product.stock}
+                        {product.stock} {product.unit}
                       </span>
                     </div>
                   </button>
@@ -302,6 +337,7 @@ const POSPage = () => {
             <CardContent className="pt-4">
               {/* Customer selection */}
               <div className="mb-4">
+                <Label className="overline block mb-1">Client</Label>
                 <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
                   <SelectTrigger className="rounded-sm" data-testid="select-customer">
                     <SelectValue placeholder="Client comptoir" />
@@ -310,56 +346,70 @@ const POSPage = () => {
                     <SelectItem value="comptoir">Client comptoir</SelectItem>
                     {customers.map((customer) => (
                       <SelectItem key={customer.id} value={customer.id}>
-                        {customer.name}
+                        {customer.name} {customer.balance > 0 && `(Solde: ${formatCurrency(customer.balance)})`}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              {/* Cart items */}
-              <div className="space-y-2 max-h-[300px] overflow-y-auto mb-4">
+              {/* Cart items with editable quantity */}
+              <div className="space-y-2 max-h-[250px] overflow-y-auto mb-4">
                 {cart.length > 0 ? (
                   cart.map((item) => (
-                    <div key={item.product_id} className="pos-item bg-slate-50 rounded-sm">
-                      <div className="flex-1">
-                        <p className="font-medium text-slate-900 text-sm">
+                    <div key={item.product_id} className="p-3 bg-slate-50 rounded-sm">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="font-medium text-slate-900 text-sm flex-1 truncate">
                           {item.product_name}
                         </p>
-                        <p className="text-xs text-slate-500 font-mono">
-                          {formatCurrency(item.unit_price)} × {item.quantity}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => updateQuantity(item.product_id, -1)}
-                          className="w-8 h-8 p-0 rounded-sm"
-                          data-testid={`decrease-qty-${item.product_id}`}
-                        >
-                          <Minus className="w-3 h-3" />
-                        </Button>
-                        <span className="font-mono w-8 text-center">{item.quantity}</span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => updateQuantity(item.product_id, 1)}
-                          className="w-8 h-8 p-0 rounded-sm"
-                          data-testid={`increase-qty-${item.product_id}`}
-                        >
-                          <Plus className="w-3 h-3" />
-                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => removeFromCart(item.product_id)}
-                          className="w-8 h-8 p-0 text-red-600"
+                          className="w-6 h-6 p-0 text-red-600"
                           data-testid={`remove-item-${item.product_id}`}
                         >
                           <Trash2 className="w-3 h-3" />
                         </Button>
                       </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => decrementQuantity(item.product_id)}
+                            className="w-7 h-7 p-0 rounded-sm"
+                            data-testid={`decrease-qty-${item.product_id}`}
+                          >
+                            <Minus className="w-3 h-3" />
+                          </Button>
+                          <Input
+                            type="number"
+                            value={item.quantity}
+                            onChange={(e) => updateQuantity(item.product_id, e.target.value)}
+                            className="w-16 h-7 text-center font-mono text-sm rounded-sm"
+                            step="0.5"
+                            min="0.1"
+                            data-testid={`qty-input-${item.product_id}`}
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => incrementQuantity(item.product_id)}
+                            className="w-7 h-7 p-0 rounded-sm"
+                            data-testid={`increase-qty-${item.product_id}`}
+                          >
+                            <Plus className="w-3 h-3" />
+                          </Button>
+                          <span className="text-xs text-slate-500 ml-1">{item.unit}</span>
+                        </div>
+                        <span className="font-mono font-medium text-slate-900">
+                          {formatCurrency(item.total)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">
+                        {formatCurrency(item.unit_price)} × {item.quantity}
+                      </p>
                     </div>
                   ))
                 ) : (
@@ -371,30 +421,27 @@ const POSPage = () => {
               </div>
 
               {/* Payment method */}
-              <div className="grid grid-cols-2 gap-2 mb-4">
-                <Button
-                  variant={paymentMethod === "cash" ? "default" : "outline"}
-                  onClick={() => setPaymentMethod("cash")}
-                  className={`rounded-sm ${paymentMethod === "cash" ? "bg-slate-900" : ""}`}
-                  data-testid="payment-cash"
-                >
-                  <Banknote className="w-4 h-4 mr-2" />
-                  Espèces
-                </Button>
-                <Button
-                  variant={paymentMethod === "card" ? "default" : "outline"}
-                  onClick={() => setPaymentMethod("card")}
-                  className={`rounded-sm ${paymentMethod === "card" ? "bg-slate-900" : ""}`}
-                  data-testid="payment-card"
-                >
-                  <CreditCard className="w-4 h-4 mr-2" />
-                  Carte
-                </Button>
+              <div className="mb-4">
+                <Label className="overline block mb-2">Mode de règlement</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {paymentMethods.map((method) => (
+                    <Button
+                      key={method.value}
+                      variant={paymentMethod === method.value ? "default" : "outline"}
+                      onClick={() => setPaymentMethod(method.value)}
+                      className={`rounded-sm text-xs ${paymentMethod === method.value ? "bg-slate-900" : ""}`}
+                      data-testid={`payment-${method.value}`}
+                    >
+                      <method.icon className="w-3 h-3 mr-1" />
+                      {method.label}
+                    </Button>
+                  ))}
+                </div>
               </div>
 
               {/* Discount */}
               <div className="mb-4">
-                <label className="overline block mb-1">Remise (XOF)</label>
+                <Label className="overline block mb-1">Remise (XOF)</Label>
                 <Input
                   type="number"
                   value={discount}
@@ -405,15 +452,32 @@ const POSPage = () => {
                 />
               </div>
 
+              {/* Amount paid */}
+              <div className="mb-4">
+                <Label className="overline block mb-1">Montant reçu (XOF)</Label>
+                <Input
+                  type="number"
+                  value={amountPaid}
+                  onChange={(e) => setAmountPaid(Math.max(0, parseFloat(e.target.value) || 0))}
+                  min="0"
+                  className="rounded-sm font-mono"
+                  data-testid="input-amount-paid"
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setAmountPaid(total)}
+                  className="mt-1 text-xs text-green-600"
+                >
+                  Montant exact
+                </Button>
+              </div>
+
               {/* Totals */}
               <div className="border-t border-slate-200 pt-4 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">Sous-total</span>
                   <span className="font-mono">{formatCurrency(subtotal)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">TVA (18%)</span>
-                  <span className="font-mono">{formatCurrency(tax)}</span>
                 </div>
                 {discount > 0 && (
                   <div className="flex justify-between text-sm text-green-600">
@@ -421,7 +485,26 @@ const POSPage = () => {
                     <span className="font-mono">-{formatCurrency(discount)}</span>
                   </div>
                 )}
-                <div className="pos-total flex justify-between items-center mt-4">
+                <div className="flex justify-between text-sm font-medium">
+                  <span>Total</span>
+                  <span className="font-mono">{formatCurrency(total)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Montant reçu</span>
+                  <span className="font-mono">{formatCurrency(amountPaid)}</span>
+                </div>
+                {balanceDue > 0 ? (
+                  <div className="flex justify-between text-sm text-orange-600">
+                    <span>Reste à payer</span>
+                    <span className="font-mono">{formatCurrency(balanceDue)}</span>
+                  </div>
+                ) : balanceDue < 0 ? (
+                  <div className="flex justify-between text-sm text-green-600">
+                    <span>Monnaie à rendre</span>
+                    <span className="font-mono">{formatCurrency(Math.abs(balanceDue))}</span>
+                  </div>
+                ) : null}
+                <div className="bg-slate-900 text-white p-4 rounded-sm flex justify-between items-center mt-4">
                   <span className="font-bold">TOTAL</span>
                   <span className="text-2xl font-mono font-bold">{formatCurrency(total)}</span>
                 </div>
