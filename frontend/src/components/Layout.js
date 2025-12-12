@@ -48,6 +48,7 @@ const Layout = () => {
     { to: "/suppliers", icon: Truck, label: "Fournisseurs" },
     { to: "/orders", icon: ClipboardList, label: "Commandes" },
     { to: "/depots", icon: Warehouse, label: "Dépôts" },
+    { to: "/bank-journal", icon: Landmark, label: "Journal Banque" },
     { to: "/reports", icon: BarChart3, label: "Rapports" },
   ];
 
