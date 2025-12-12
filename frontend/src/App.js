@@ -14,6 +14,7 @@ import ReportsPage from "./pages/ReportsPage";
 import UsersPage from "./pages/UsersPage";
 import DepotsPage from "./pages/DepotsPage";
 import InvoicePage from "./pages/InvoicePage";
+import BankJournalPage from "./pages/BankJournalPage";
 import Layout from "./components/Layout";
 import "./App.css";
 
