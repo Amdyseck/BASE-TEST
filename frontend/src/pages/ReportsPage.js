@@ -7,6 +7,13 @@ import { Label } from "../components/ui/label";
 import { Calendar } from "../components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -21,8 +28,10 @@ import {
   TrendingUp,
   Package,
   Calendar as CalendarIcon,
-  Download,
   AlertTriangle,
+  Save,
+  Users,
+  Truck,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -30,7 +39,12 @@ import { fr } from "date-fns/locale";
 const ReportsPage = () => {
   const [salesReport, setSalesReport] = useState(null);
   const [inventoryReport, setInventoryReport] = useState(null);
+  const [balances, setBalances] = useState(null);
+  const [depots, setDepots] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [stockFilter, setStockFilter] = useState("all");
+  const [selectedDepot, setSelectedDepot] = useState("all");
+  const [editedStocks, setEditedStocks] = useState({});
   const [dateRange, setDateRange] = useState({
     start: null,
     end: null,
@@ -38,7 +52,27 @@ const ReportsPage = () => {
 
   useEffect(() => {
     fetchReports();
+    fetchDepots();
+    fetchBalances();
   }, []);
+
+  const fetchDepots = async () => {
+    try {
+      const response = await api.get("/depots");
+      setDepots(response.data);
+    } catch (error) {
+      console.error("Error fetching depots:", error);
+    }
+  };
+
+  const fetchBalances = async () => {
+    try {
+      const response = await api.get("/balances/summary");
+      setBalances(response.data);
+    } catch (error) {
+      console.error("Error fetching balances:", error);
+    }
+  };
 
   const fetchReports = async () => {
     try {
@@ -50,9 +84,21 @@ const ReportsPage = () => {
         }
       }
 
+      let inventoryUrl = "/reports/inventory";
+      const params = [];
+      if (stockFilter !== "all") {
+        params.push(`stock_filter=${stockFilter}`);
+      }
+      if (selectedDepot !== "all") {
+        params.push(`depot_id=${selectedDepot}`);
+      }
+      if (params.length > 0) {
+        inventoryUrl += `?${params.join("&")}`;
+      }
+
       const [salesRes, inventoryRes] = await Promise.all([
         api.get(salesUrl),
-        api.get("/reports/inventory"),
+        api.get(inventoryUrl),
       ]);
       setSalesReport(salesRes.data);
       setInventoryReport(inventoryRes.data);
@@ -60,6 +106,31 @@ const ReportsPage = () => {
       toast.error("Erreur lors du chargement des rapports");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleStockChange = (productId, value) => {
+    setEditedStocks({
+      ...editedStocks,
+      [productId]: parseFloat(value) || 0,
+    });
+  };
+
+  const saveStock = async (productId) => {
+    const newStock = editedStocks[productId];
+    if (newStock === undefined) return;
+
+    try {
+      await api.put(`/products/${productId}/stock?stock=${newStock}`);
+      toast.success("Stock mis à jour");
+      // Remove from edited
+      const newEdited = { ...editedStocks };
+      delete newEdited[productId];
+      setEditedStocks(newEdited);
+      // Refresh
+      fetchReports();
+    } catch (error) {
+      toast.error("Erreur lors de la mise à jour du stock");
     }
   };
 
@@ -82,6 +153,16 @@ const ReportsPage = () => {
   const handleFilter = () => {
     setLoading(true);
     fetchReports();
+  };
+
+  const getPaymentMethodLabel = (method) => {
+    const labels = {
+      especes: "Espèces",
+      wave: "Wave",
+      orange_money: "Orange Money",
+      cheque: "Chèque",
+    };
+    return labels[method] || method;
   };
 
   if (loading) {
@@ -112,6 +193,10 @@ const ReportsPage = () => {
           <TabsTrigger value="inventory" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white" data-testid="tab-inventory">
             <Package className="w-4 h-4 mr-2" />
             Inventaire
+          </TabsTrigger>
+          <TabsTrigger value="balances" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white" data-testid="tab-balances">
+            <Users className="w-4 h-4 mr-2" />
+            Comptes tiers
           </TabsTrigger>
         </TabsList>
 
@@ -196,19 +281,19 @@ const ReportsPage = () => {
                 </p>
               </CardContent>
             </Card>
-            <Card className="stat-card" data-testid="stat-total-tax">
-              <CardContent className="pt-4">
-                <p className="stat-card-label">TVA collectée</p>
-                <p className="stat-card-value text-lg">
-                  {formatCurrency(salesReport?.summary?.total_tax || 0)}
-                </p>
-              </CardContent>
-            </Card>
             <Card className="stat-card" data-testid="stat-total-discount">
               <CardContent className="pt-4">
                 <p className="stat-card-label">Remises accordées</p>
                 <p className="stat-card-value text-lg">
                   {formatCurrency(salesReport?.summary?.total_discount || 0)}
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="stat-card" data-testid="stat-total-balance-due">
+              <CardContent className="pt-4">
+                <p className="stat-card-label">Créances clients</p>
+                <p className="stat-card-value text-lg text-orange-600">
+                  {formatCurrency(salesReport?.summary?.total_balance_due || 0)}
                 </p>
               </CardContent>
             </Card>
@@ -225,7 +310,9 @@ const ReportsPage = () => {
                   <TableHead>Facture</TableHead>
                   <TableHead>Client</TableHead>
                   <TableHead>Date</TableHead>
+                  <TableHead>Règlement</TableHead>
                   <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="text-right">Reste</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -235,14 +322,22 @@ const ReportsPage = () => {
                       <TableCell className="font-mono">{sale.invoice_number}</TableCell>
                       <TableCell>{sale.customer_name}</TableCell>
                       <TableCell className="text-slate-500">{formatDate(sale.created_at)}</TableCell>
+                      <TableCell>
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
+                          {getPaymentMethodLabel(sale.payment_method)}
+                        </span>
+                      </TableCell>
                       <TableCell className="text-right font-mono font-medium">
                         {formatCurrency(sale.total)}
+                      </TableCell>
+                      <TableCell className={`text-right font-mono ${sale.balance_due > 0 ? "text-orange-600" : "text-green-600"}`}>
+                        {formatCurrency(sale.balance_due || 0)}
                       </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-8 text-slate-500">
+                    <TableCell colSpan={6} className="text-center py-8 text-slate-500">
                       Aucune vente pour cette période
                     </TableCell>
                   </TableRow>
@@ -254,6 +349,47 @@ const ReportsPage = () => {
 
         {/* Inventory Report */}
         <TabsContent value="inventory" className="space-y-6">
+          {/* Filters */}
+          <Card className="bg-white border border-slate-200 rounded-sm">
+            <CardContent className="pt-4">
+              <div className="flex flex-wrap items-end gap-4">
+                <div className="space-y-2">
+                  <Label className="overline">Filtre stock</Label>
+                  <Select value={stockFilter} onValueChange={setStockFilter}>
+                    <SelectTrigger className="w-48 rounded-sm" data-testid="stock-filter">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous les produits</SelectItem>
+                      <SelectItem value="available">Stock disponible</SelectItem>
+                      <SelectItem value="low">Stock faible</SelectItem>
+                      <SelectItem value="out">Rupture de stock</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="overline">Dépôt</Label>
+                  <Select value={selectedDepot} onValueChange={setSelectedDepot}>
+                    <SelectTrigger className="w-48 rounded-sm" data-testid="depot-filter">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous les dépôts</SelectItem>
+                      {depots.map((depot) => (
+                        <SelectItem key={depot.id} value={depot.id}>
+                          {depot.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button onClick={handleFilter} className="btn-primary" data-testid="apply-filter-btn">
+                  Appliquer
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Inventory summary */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card className="stat-card" data-testid="stat-inv-products">
@@ -282,7 +418,7 @@ const ReportsPage = () => {
               <CardContent className="pt-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="stat-card-label">Stock bas</p>
+                    <p className="stat-card-label">Stock faible</p>
                     <p className={`stat-card-value ${inventoryReport?.summary?.low_stock_count > 0 ? "text-orange-600" : ""}`}>
                       {inventoryReport?.summary?.low_stock_count || 0}
                     </p>
@@ -305,9 +441,9 @@ const ReportsPage = () => {
                 <TableRow>
                   <TableHead>Produit</TableHead>
                   <TableHead>Référence</TableHead>
-                  <TableHead className="text-right">Stock</TableHead>
+                  <TableHead className="text-right">Stock système</TableHead>
                   <TableHead className="text-right">Min</TableHead>
-                  <TableHead className="text-right">Valeur</TableHead>
+                  <TableHead className="text-right">Stock réel</TableHead>
                   <TableHead className="text-center">Statut</TableHead>
                 </TableRow>
               </TableHeader>
@@ -316,6 +452,7 @@ const ReportsPage = () => {
                   inventoryReport.products.map((product) => {
                     const isLowStock = product.stock <= product.min_stock;
                     const isOutOfStock = product.stock === 0;
+                    const hasEdit = editedStocks[product.id] !== undefined;
                     return (
                       <TableRow key={product.id} className="table-row">
                         <TableCell className="font-medium">{product.name}</TableCell>
@@ -324,8 +461,26 @@ const ReportsPage = () => {
                         <TableCell className="text-right font-mono text-slate-500">
                           {product.min_stock}
                         </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatCurrency(product.stock * product.cost_price)}
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Input
+                              type="number"
+                              defaultValue={product.stock}
+                              onChange={(e) => handleStockChange(product.id, e.target.value)}
+                              className="w-20 h-8 text-right font-mono rounded-sm"
+                              data-testid={`stock-input-${product.id}`}
+                            />
+                            {hasEdit && (
+                              <Button
+                                size="sm"
+                                onClick={() => saveStock(product.id)}
+                                className="h-8 w-8 p-0 btn-accent"
+                                data-testid={`save-stock-${product.id}`}
+                              >
+                                <Save className="w-3 h-3" />
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="text-center">
                           <span
@@ -337,7 +492,7 @@ const ReportsPage = () => {
                                 : "bg-green-100 text-green-700"
                             }`}
                           >
-                            {isOutOfStock ? "Rupture" : isLowStock ? "Stock bas" : "OK"}
+                            {isOutOfStock ? "Rupture" : isLowStock ? "Stock faible" : "OK"}
                           </span>
                         </TableCell>
                       </TableRow>
@@ -347,6 +502,115 @@ const ReportsPage = () => {
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8 text-slate-500">
                       Aucun produit
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
+
+        {/* Balances Report */}
+        <TabsContent value="balances" className="space-y-6">
+          {/* Summary */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="stat-card border-blue-200" data-testid="stat-customer-balance">
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="stat-card-label">Créances clients</p>
+                    <p className="stat-card-value text-lg text-blue-600">
+                      {formatCurrency(balances?.total_customer_balance || 0)}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Montant dû par les clients
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 bg-blue-100 rounded-sm flex items-center justify-center">
+                    <Users className="w-6 h-6 text-blue-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="stat-card border-orange-200" data-testid="stat-supplier-balance">
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="stat-card-label">Dettes fournisseurs</p>
+                    <p className="stat-card-value text-lg text-orange-600">
+                      {formatCurrency(balances?.total_supplier_balance || 0)}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Montant dû aux fournisseurs
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 bg-orange-100 rounded-sm flex items-center justify-center">
+                    <Truck className="w-6 h-6 text-orange-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Customers with balance */}
+          <Card className="table-container">
+            <CardHeader className="border-b border-slate-100">
+              <CardTitle className="font-[Chivo]">Soldes clients</CardTitle>
+            </CardHeader>
+            <Table className="data-table">
+              <TableHeader className="table-header">
+                <TableRow>
+                  <TableHead>Client</TableHead>
+                  <TableHead className="text-right">Solde</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {balances?.customers_with_balance?.length > 0 ? (
+                  balances.customers_with_balance.map((customer) => (
+                    <TableRow key={customer.id} className="table-row">
+                      <TableCell className="font-medium">{customer.name}</TableCell>
+                      <TableCell className={`text-right font-mono font-medium ${customer.balance > 0 ? "text-blue-600" : "text-green-600"}`}>
+                        {formatCurrency(customer.balance)}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={2} className="text-center py-8 text-slate-500">
+                      Aucun solde client
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+
+          {/* Suppliers with balance */}
+          <Card className="table-container">
+            <CardHeader className="border-b border-slate-100">
+              <CardTitle className="font-[Chivo]">Soldes fournisseurs</CardTitle>
+            </CardHeader>
+            <Table className="data-table">
+              <TableHeader className="table-header">
+                <TableRow>
+                  <TableHead>Fournisseur</TableHead>
+                  <TableHead className="text-right">Solde</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {balances?.suppliers_with_balance?.length > 0 ? (
+                  balances.suppliers_with_balance.map((supplier) => (
+                    <TableRow key={supplier.id} className="table-row">
+                      <TableCell className="font-medium">{supplier.name}</TableCell>
+                      <TableCell className={`text-right font-mono font-medium ${supplier.balance > 0 ? "text-orange-600" : "text-green-600"}`}>
+                        {formatCurrency(supplier.balance)}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={2} className="text-center py-8 text-slate-500">
+                      Aucun solde fournisseur
                     </TableCell>
                   </TableRow>
                 )}
