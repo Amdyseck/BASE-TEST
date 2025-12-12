@@ -162,8 +162,14 @@ const ReportsPage = () => {
       wave: "Wave",
       orange_money: "Orange Money",
       cheque: "Chèque",
+      banque: "Banque",
     };
     return labels[method] || method;
+  };
+
+  const getDepotName = (depotId) => {
+    const depot = depots.find((d) => d.id === depotId);
+    return depot?.name || "-";
   };
 
   if (loading) {
