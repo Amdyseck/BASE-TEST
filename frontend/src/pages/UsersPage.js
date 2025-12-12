@@ -28,20 +28,29 @@ import {
   TableRow,
 } from "../components/ui/table";
 import { toast } from "sonner";
-import { Users, Shield, Trash2, Plus, Eye, EyeOff } from "lucide-react";
+import { Users, Shield, Trash2, Plus, Eye, EyeOff, Pencil, Key } from "lucide-react";
 
 const UsersPage = () => {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
     role: "vendeur",
   });
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    email: "",
+    role: "",
+  });
+  const [newPassword, setNewPassword] = useState("");
 
   useEffect(() => {
     fetchUsers();
@@ -79,6 +88,50 @@ const UsersPage = () => {
       role: "vendeur",
     });
     setShowPassword(false);
+  };
+
+  const handleEditUser = async (e) => {
+    e.preventDefault();
+    if (!selectedUser) return;
+    try {
+      await api.put(`/users/${selectedUser.id}`, editFormData);
+      toast.success("Utilisateur mis à jour");
+      setIsEditDialogOpen(false);
+      setSelectedUser(null);
+      fetchUsers();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Erreur lors de la mise à jour");
+    }
+  };
+
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    if (!selectedUser || !newPassword) return;
+    try {
+      await api.put(`/users/${selectedUser.id}`, { password: newPassword });
+      toast.success("Mot de passe modifié avec succès");
+      setIsPasswordDialogOpen(false);
+      setSelectedUser(null);
+      setNewPassword("");
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Erreur lors de la modification du mot de passe");
+    }
+  };
+
+  const openEditDialog = (user) => {
+    setSelectedUser(user);
+    setEditFormData({
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const openPasswordDialog = (user) => {
+    setSelectedUser(user);
+    setNewPassword("");
+    setIsPasswordDialogOpen(true);
   };
 
   const handleRoleChange = async (userId, newRole) => {
@@ -324,23 +377,152 @@ const UsersPage = () => {
                   )}
                 </TableCell>
                 <TableCell className="text-right">
-                  {user.id !== currentUser?.id && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(user.id)}
-                      className="text-red-600 hover:text-red-700"
-                      data-testid={`delete-user-${user.id}`}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  )}
+                  <div className="flex items-center justify-end gap-1">
+                    {user.id !== currentUser?.id && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openEditDialog(user)}
+                          className="text-blue-600 hover:text-blue-700"
+                          data-testid={`edit-user-${user.id}`}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openPasswordDialog(user)}
+                          className="text-orange-600 hover:text-orange-700"
+                          data-testid={`password-user-${user.id}`}
+                        >
+                          <Key className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(user.id)}
+                          className="text-red-600 hover:text-red-700"
+                          data-testid={`delete-user-${user.id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </Card>
+
+      {/* Edit User Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="font-[Chivo]">Modifier l'utilisateur</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditUser} className="space-y-4">
+            <div className="space-y-2">
+              <Label className="overline">Nom complet</Label>
+              <Input
+                value={editFormData.name}
+                onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                required
+                className="rounded-sm"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="overline">Email</Label>
+              <Input
+                type="email"
+                value={editFormData.email}
+                onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                required
+                className="rounded-sm"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="overline">Rôle</Label>
+              <Select
+                value={editFormData.role}
+                onValueChange={(value) => setEditFormData({ ...editFormData, role: value })}
+              >
+                <SelectTrigger className="rounded-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Administrateur</SelectItem>
+                  <SelectItem value="vendeur">Vendeur</SelectItem>
+                  <SelectItem value="caissier">Caissier</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsEditDialogOpen(false)}
+                className="rounded-sm"
+              >
+                Annuler
+              </Button>
+              <Button type="submit" className="btn-primary">
+                Enregistrer
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Password Dialog */}
+      <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="font-[Chivo]">Modifier le mot de passe</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handlePasswordChange} className="space-y-4">
+            <p className="text-sm text-slate-500">
+              Modifier le mot de passe de: <strong>{selectedUser?.name}</strong>
+            </p>
+            <div className="space-y-2">
+              <Label className="overline">Nouveau mot de passe</Label>
+              <div className="relative">
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  minLength={4}
+                  className="rounded-sm pr-10"
+                  placeholder="Entrez le nouveau mot de passe"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsPasswordDialogOpen(false)}
+                className="rounded-sm"
+              >
+                Annuler
+              </Button>
+              <Button type="submit" className="btn-primary">
+                Modifier
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
       
       {/* Footer */}
       <div className="text-center text-xs text-slate-400 mt-8">
