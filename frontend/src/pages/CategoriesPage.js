@@ -54,10 +54,10 @@ const CategoriesPage = () => {
     try {
       if (editingCategory) {
         await api.put(`/categories/${editingCategory.id}`, formData);
-        toast.success("Catégorie mise à jour");
+        toast.success("Famille mise à jour");
       } else {
         await api.post("/categories", formData);
-        toast.success("Catégorie créée");
+        toast.success("Famille créée");
       }
       setIsDialogOpen(false);
       resetForm();
@@ -77,10 +77,10 @@ const CategoriesPage = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Êtes-vous sûr de vouloir supprimer cette catégorie ?")) return;
+    if (!window.confirm("Êtes-vous sûr de vouloir supprimer cette famille ?")) return;
     try {
       await api.delete(`/categories/${id}`);
-      toast.success("Catégorie supprimée");
+      toast.success("Famille supprimée");
       fetchCategories();
     } catch (error) {
       toast.error("Erreur lors de la suppression");
@@ -108,9 +108,9 @@ const CategoriesPage = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold font-[Chivo] tracking-tight text-slate-900">
-            Catégories
+            Familles
           </h1>
-          <p className="text-slate-500 mt-1">Organisez vos produits par catégories</p>
+          <p className="text-slate-500 mt-1">Organisez vos produits par familles</p>
         </div>
         {(isAdmin || isVendeur) && (
           <Dialog open={isDialogOpen} onOpenChange={(open) => {
@@ -120,18 +120,18 @@ const CategoriesPage = () => {
             <DialogTrigger asChild>
               <Button className="btn-primary" data-testid="add-category-btn">
                 <Plus className="w-4 h-4 mr-2" />
-                Nouvelle catégorie
+                Nouvelle famille
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle className="font-[Chivo]">
-                  {editingCategory ? "Modifier la catégorie" : "Nouvelle catégorie"}
+                  {editingCategory ? "Modifier la famille" : "Nouvelle famille"}
                 </DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label className="overline">Nom de la catégorie</Label>
+                  <Label className="overline">Nom de la famille</Label>
                   <Input
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -172,7 +172,7 @@ const CategoriesPage = () => {
         <Table className="data-table">
           <TableHeader className="table-header">
             <TableRow>
-              <TableHead>Catégorie</TableHead>
+              <TableHead>Famille</TableHead>
               <TableHead>Description</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -224,7 +224,7 @@ const CategoriesPage = () => {
                 <TableCell colSpan={3} className="text-center py-12">
                   <div className="empty-state">
                     <FolderOpen className="w-12 h-12 mx-auto text-slate-300 mb-3" />
-                    <p>Aucune catégorie</p>
+                    <p>Aucune famille</p>
                   </div>
                 </TableCell>
               </TableRow>
