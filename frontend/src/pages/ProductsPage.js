@@ -223,7 +223,7 @@ const ProductsPage = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="overline">SKU</Label>
+                    <Label className="overline">Référence</Label>
                     <Input
                       value={formData.sku}
                       onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
@@ -248,7 +248,7 @@ const ProductsPage = () => {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label className="overline">Catégorie</Label>
+                    <Label className="overline">Famille</Label>
                     <Select
                       value={formData.category_id}
                       onValueChange={(value) => setFormData({ ...formData, category_id: value })}
@@ -375,7 +375,7 @@ const ProductsPage = () => {
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
-                placeholder="Rechercher par nom, SKU ou code-barres..."
+                placeholder="Rechercher par nom, référence ou code-barres..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 rounded-sm"
@@ -384,7 +384,7 @@ const ProductsPage = () => {
             </div>
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
               <SelectTrigger className="w-full md:w-48 rounded-sm" data-testid="filter-category">
-                <SelectValue placeholder="Catégorie" />
+                <SelectValue placeholder="Famille" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Toutes les catégories</SelectItem>
@@ -405,8 +405,8 @@ const ProductsPage = () => {
           <TableHeader className="table-header">
             <TableRow>
               <TableHead>Produit</TableHead>
-              <TableHead>SKU</TableHead>
-              <TableHead>Catégorie</TableHead>
+              <TableHead>Référence</TableHead>
+              <TableHead>Famille</TableHead>
               <TableHead className="text-right">Prix</TableHead>
               <TableHead className="text-center">Stock</TableHead>
               <TableHead className="text-right">Actions</TableHead>
