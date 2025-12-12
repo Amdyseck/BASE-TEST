@@ -70,7 +70,7 @@ class QuincaillerieAPITester:
             "POST",
             "auth/login",
             200,
-            data={"email": "admin@quincaillerie.com", "password": "admin123"}
+            data={"email": "admin@intertrade.sn", "password": "admin123"}
         )
         if success and 'access_token' in response:
             self.token = response['access_token']
