@@ -70,7 +70,7 @@ const POSPage = () => {
       addToCart(response.data);
       setBarcodeInput("");
     } catch (error) {
-      // Try to find by SKU
+      // Try to find by reference
       const product = products.find(
         (p) => p.sku.toLowerCase() === barcodeInput.toLowerCase() || p.barcode === barcodeInput
       );
@@ -229,7 +229,7 @@ const POSPage = () => {
                   <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <Input
                     ref={barcodeInputRef}
-                    placeholder="Scanner ou saisir code-barres / SKU..."
+                    placeholder="Scanner ou saisir code-barres / référence..."
                     value={barcodeInput}
                     onChange={(e) => setBarcodeInput(e.target.value)}
                     className="pl-10 rounded-sm font-mono"
