@@ -151,7 +151,7 @@ class SaleBase(BaseModel):
     items: List[SaleItem]
     customer_id: Optional[str] = None
     customer_name: Optional[str] = "Client Comptoir"
-    payment_method: str = "especes"  # especes, wave, orange_money, cheque
+    payment_method: str = "especes"  # especes, wave, orange_money, cheque, banque
     amount_paid: float = 0
     discount: float = 0
     notes: Optional[str] = ""
@@ -163,6 +163,8 @@ class Sale(SaleBase):
     subtotal: float = 0
     total: float = 0
     balance_due: float = 0  # Montant restant à payer
+    status: str = "active"  # active, cancelled, returned
+    is_paid: bool = False  # Facture entièrement payée
     cashier_id: str = ""
     cashier_name: str = ""
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
