@@ -5,7 +5,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { toast } from "sonner";
-import { Wrench, Eye, EyeOff } from "lucide-react";
+import { Leaf, Eye, EyeOff } from "lucide-react";
 
 const LoginPage = () => {
   const [loading, setLoading] = useState(false);
@@ -44,14 +44,14 @@ const LoginPage = () => {
       >
         <div className="w-full h-full bg-slate-900/60 flex items-center justify-center p-12">
           <div className="text-center text-white">
-            <div className="w-20 h-20 bg-orange-500 rounded-sm mx-auto mb-6 flex items-center justify-center">
-              <Wrench className="w-12 h-12" />
+            <div className="w-20 h-20 bg-green-600 rounded-sm mx-auto mb-6 flex items-center justify-center">
+              <Leaf className="w-12 h-12" />
             </div>
             <h1 className="text-4xl font-bold font-[Chivo] tracking-tight mb-4">
-              Quincaillerie Gora MBAYE
+              INTERTRADE TOUBA
             </h1>
             <p className="text-slate-300 max-w-md">
-              Solution complète de gestion pour votre quincaillerie. 
+              Solution complète de gestion pour vos produits alimentaires. 
               Gérez vos stocks, ventes et clients en toute simplicité.
             </p>
           </div>
@@ -63,12 +63,12 @@ const LoginPage = () => {
         <div className="w-full max-w-md">
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-3 mb-8">
-            <div className="w-12 h-12 bg-orange-500 rounded-sm flex items-center justify-center">
-              <Wrench className="w-8 h-8 text-white" />
+            <div className="w-12 h-12 bg-green-600 rounded-sm flex items-center justify-center">
+              <Leaf className="w-8 h-8 text-white" />
             </div>
             <div>
               <h1 className="font-bold text-xl font-[Chivo] tracking-tight text-slate-900">
-                Quincaillerie Gora MBAYE
+                INTERTRADE TOUBA
               </h1>
             </div>
           </div>
