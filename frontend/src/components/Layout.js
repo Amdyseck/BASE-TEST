@@ -15,6 +15,7 @@ import {
   LogOut,
   Menu,
   X,
+  Warehouse,
   Leaf,
 } from "lucide-react";
 import { Button } from "./ui/button";
@@ -45,6 +46,7 @@ const Layout = () => {
     { to: "/customers", icon: Users, label: "Clients" },
     { to: "/suppliers", icon: Truck, label: "Fournisseurs" },
     { to: "/orders", icon: ClipboardList, label: "Commandes" },
+    { to: "/depots", icon: Warehouse, label: "Dépôts" },
     { to: "/reports", icon: BarChart3, label: "Rapports" },
   ];
 
