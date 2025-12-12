@@ -426,6 +426,7 @@ const ProductsPage = () => {
               <TableHead>Produit</TableHead>
               <TableHead>Référence</TableHead>
               <TableHead>Famille</TableHead>
+              <TableHead>Dépôt</TableHead>
               <TableHead className="text-right">Prix</TableHead>
               <TableHead className="text-center">Stock</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -452,6 +453,16 @@ const ProductsPage = () => {
                     </TableCell>
                     <TableCell className="font-mono">{product.sku}</TableCell>
                     <TableCell>{getCategoryName(product.category_id)}</TableCell>
+                    <TableCell>
+                      {product.depot_id ? (
+                        <div className="flex items-center gap-1 text-sm">
+                          <Warehouse className="w-3 h-3 text-green-500" />
+                          <span className="text-slate-600">{getDepotName(product.depot_id)}</span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 text-xs">Non affecté</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right font-mono">
                       {formatCurrency(product.price)}
                     </TableCell>
@@ -498,7 +509,7 @@ const ProductsPage = () => {
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-12">
+                <TableCell colSpan={7} className="text-center py-12">
                   <div className="empty-state">
                     <Package className="w-12 h-12 mx-auto text-slate-300 mb-3" />
                     <p>Aucun produit trouvé</p>
