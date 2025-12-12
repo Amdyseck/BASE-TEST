@@ -448,6 +448,7 @@ const ReportsPage = () => {
                 <TableRow>
                   <TableHead>Produit</TableHead>
                   <TableHead>Référence</TableHead>
+                  <TableHead>Dépôt</TableHead>
                   <TableHead className="text-right">Stock système</TableHead>
                   <TableHead className="text-right">Min</TableHead>
                   <TableHead className="text-right">Stock réel</TableHead>
@@ -464,6 +465,16 @@ const ReportsPage = () => {
                       <TableRow key={product.id} className="table-row">
                         <TableCell className="font-medium">{product.name}</TableCell>
                         <TableCell className="font-mono text-slate-500">{product.sku}</TableCell>
+                        <TableCell>
+                          {product.depot_id ? (
+                            <div className="flex items-center gap-1 text-sm">
+                              <Warehouse className="w-3 h-3 text-green-500" />
+                              <span className="text-slate-600">{getDepotName(product.depot_id)}</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 text-xs">Non affecté</span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-right font-mono">{product.stock}</TableCell>
                         <TableCell className="text-right font-mono text-slate-500">
                           {product.min_stock}
@@ -507,7 +518,7 @@ const ReportsPage = () => {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-slate-500">
+                    <TableCell colSpan={7} className="text-center py-8 text-slate-500">
                       Aucun produit
                     </TableCell>
                   </TableRow>
