@@ -1093,8 +1093,13 @@ async def assign_products_to_depot(depot_id: str, product_ids: Optional[List[str
 
 async def generate_order_number():
     today = datetime.now(timezone.utc).strftime("%Y%m%d")
-    count = await db.orders.count_documents({"order_number": {"$regex": f"^CMD-{today}"}})
-    return f"CMD-{today}-{str(count + 1).zfill(4)}"
+    count = await db.orders.count_documents({"order_number": {"$regex": f"^ACH-{today}"}})
+    return f"ACH-{today}-{str(count + 1).zfill(4)}"
+
+async def generate_supplier_invoice_number():
+    today = datetime.now(timezone.utc).strftime("%Y%m%d")
+    count = await db.supplier_invoices.count_documents({"invoice_number": {"$regex": f"^FF-{today}"}})
+    return f"FF-{today}-{str(count + 1).zfill(4)}"
 
 @api_router.post("/orders", response_model=Order)
 async def create_order(order_data: OrderBase, user: dict = Depends(require_role(["admin", "vendeur"]))):
@@ -1102,6 +1107,13 @@ async def create_order(order_data: OrderBase, user: dict = Depends(require_role(
     supplier = await db.suppliers.find_one({"id": order_data.supplier_id}, {"_id": 0})
     if not supplier:
         raise HTTPException(status_code=404, detail="Fournisseur non trouvé")
+    
+    # Get depot name
+    depot_name = ""
+    if order_data.depot_id:
+        depot = await db.depots.find_one({"id": order_data.depot_id}, {"_id": 0})
+        if depot:
+            depot_name = depot["name"]
     
     total = sum(item.total for item in order_data.items)
     balance_due = total - order_data.amount_paid
@@ -1111,16 +1123,10 @@ async def create_order(order_data: OrderBase, user: dict = Depends(require_role(
         **order_data.model_dump(),
         order_number=order_number,
         supplier_name=supplier["name"],
+        depot_name=depot_name,
         total=round(total, 2),
         balance_due=round(balance_due, 2)
     )
-    
-    # Update supplier balance if there's remaining amount
-    if balance_due > 0:
-        await db.suppliers.update_one(
-            {"id": order_data.supplier_id},
-            {"$inc": {"balance": balance_due}}
-        )
     
     doc = order.model_dump()
     doc["created_at"] = doc["created_at"].isoformat()
@@ -1137,29 +1143,166 @@ async def get_orders(user: dict = Depends(get_current_user)):
             o["created_at"] = datetime.fromisoformat(o["created_at"])
         if o.get("received_at") and isinstance(o["received_at"], str):
             o["received_at"] = datetime.fromisoformat(o["received_at"])
+        if o.get("invoiced_at") and isinstance(o["invoiced_at"], str):
+            o["invoiced_at"] = datetime.fromisoformat(o["invoiced_at"])
     return orders
 
 @api_router.put("/orders/{order_id}/status")
-async def update_order_status(order_id: str, status: str, user: dict = Depends(require_role(["admin", "vendeur"]))):
+async def update_order_status(order_id: str, status: str, depot_id: Optional[str] = None, user: dict = Depends(require_role(["admin", "vendeur"]))):
     if status not in ["pending", "ordered", "received", "cancelled"]:
         raise HTTPException(status_code=400, detail="Statut invalide")
     
+    order = await db.orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Commande non trouvée")
+    
     update_data = {"status": status}
+    
     if status == "received":
         update_data["received_at"] = datetime.now(timezone.utc).isoformat()
-        # Update stock for received orders
-        order = await db.orders.find_one({"id": order_id}, {"_id": 0})
-        if order:
-            for item in order.get("items", []):
-                await db.products.update_one(
-                    {"id": item["product_id"]},
-                    {"$inc": {"stock": item["quantity"]}}
-                )
+        
+        # Use depot from request or order
+        target_depot_id = depot_id or order.get("depot_id", "")
+        
+        # Update stock for received orders and assign to depot
+        for item in order.get("items", []):
+            update_query = {"$inc": {"stock": item["quantity"]}}
+            if target_depot_id:
+                update_query["$set"] = {
+                    "depot_id": target_depot_id,
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }
+            await db.products.update_one(
+                {"id": item["product_id"]},
+                update_query
+            )
     
     result = await db.orders.update_one({"id": order_id}, {"$set": update_data})
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="Commande non trouvée")
     return {"message": "Statut mis à jour"}
+
+@api_router.post("/orders/{order_id}/invoice")
+async def create_supplier_invoice(order_id: str, invoice_number: Optional[str] = None, user: dict = Depends(require_role(["admin", "vendeur"]))):
+    """Transform a received order into a supplier invoice"""
+    order = await db.orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Commande non trouvée")
+    
+    if order.get("status") != "received":
+        raise HTTPException(status_code=400, detail="Seules les commandes reçues peuvent être facturées")
+    
+    if order.get("is_invoiced"):
+        raise HTTPException(status_code=400, detail="Cette commande est déjà facturée")
+    
+    # Generate or use provided invoice number
+    inv_number = invoice_number or await generate_supplier_invoice_number()
+    
+    # Create supplier invoice
+    supplier_invoice = SupplierInvoice(
+        order_id=order_id,
+        supplier_id=order["supplier_id"],
+        supplier_name=order["supplier_name"],
+        invoice_number=inv_number,
+        items=order.get("items", []),
+        total=order["total"],
+        balance_due=order["total"],  # Full amount due
+        status="unpaid"
+    )
+    
+    doc = supplier_invoice.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    await db.supplier_invoices.insert_one(doc)
+    
+    # Update order as invoiced
+    await db.orders.update_one(
+        {"id": order_id},
+        {"$set": {
+            "is_invoiced": True,
+            "invoice_number": inv_number,
+            "invoiced_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # Update supplier balance
+    await db.suppliers.update_one(
+        {"id": order["supplier_id"]},
+        {"$inc": {"balance": order["total"]}}
+    )
+    
+    return {"message": "Facture fournisseur créée", "invoice_number": inv_number, "invoice_id": supplier_invoice.id}
+
+@api_router.get("/supplier-invoices")
+async def get_supplier_invoices(user: dict = Depends(get_current_user)):
+    """Get all supplier invoices"""
+    invoices = await db.supplier_invoices.find({}, {"_id": 0}).sort("created_at", -1).to_list(10000)
+    return invoices
+
+@api_router.get("/supplier-invoices/unpaid")
+async def get_unpaid_supplier_invoices(user: dict = Depends(get_current_user)):
+    """Get unpaid supplier invoices"""
+    invoices = await db.supplier_invoices.find(
+        {"status": {"$in": ["unpaid", "partial"]}},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(10000)
+    return invoices
+
+@api_router.post("/supplier-invoices/{invoice_id}/payment")
+async def pay_supplier_invoice(invoice_id: str, amount: float, payment_method: str = "especes", user: dict = Depends(get_current_user)):
+    """Add payment to a supplier invoice"""
+    invoice = await db.supplier_invoices.find_one({"id": invoice_id}, {"_id": 0})
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Facture non trouvée")
+    
+    new_balance = invoice.get("balance_due", 0) - amount
+    new_status = "paid" if new_balance <= 0 else "partial"
+    
+    # Update invoice
+    await db.supplier_invoices.update_one(
+        {"id": invoice_id},
+        {"$set": {
+            "balance_due": max(0, new_balance),
+            "status": new_status
+        },
+        "$inc": {"amount_paid": amount}}
+    )
+    
+    # Update supplier balance
+    await db.suppliers.update_one(
+        {"id": invoice["supplier_id"]},
+        {"$inc": {"balance": -amount}}
+    )
+    
+    # Create payment record
+    payment = Payment(
+        entity_type="supplier",
+        entity_id=invoice["supplier_id"],
+        entity_name=invoice["supplier_name"],
+        amount=amount,
+        payment_method=payment_method,
+        reference=invoice["invoice_number"],
+        created_by=user["name"]
+    )
+    doc = payment.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    await db.payments.insert_one(doc)
+    
+    # Add to bank journal if payment by bank
+    if payment_method == "banque":
+        bank_entry = BankJournalEntry(
+            description=f"Règlement fournisseur {invoice['supplier_name']} - {invoice['invoice_number']}",
+            amount=amount,
+            entry_type="debit",
+            payment_method="banque",
+            related_entity_type="supplier_invoice",
+            related_entity_id=invoice_id,
+            created_by=user["name"]
+        )
+        bank_doc = bank_entry.model_dump()
+        bank_doc["created_at"] = bank_doc["created_at"].isoformat()
+        await db.bank_journal.insert_one(bank_doc)
+    
+    return {"message": "Paiement enregistré", "balance_due": max(0, new_balance), "status": new_status}
 
 # ==================== DASHBOARD ROUTES ====================
 
