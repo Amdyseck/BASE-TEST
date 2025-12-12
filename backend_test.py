@@ -805,8 +805,8 @@ class QuincaillerieAPITester:
             )
 
 def main():
-    print("🚀 Starting Quincaillerie Pro API Tests")
-    print("=" * 50)
+    print("🚀 Starting INTERTRADE TOUBA API Tests - Purchase & Supplier Invoice Features")
+    print("=" * 70)
     
     tester = QuincaillerieAPITester()
     
@@ -821,13 +821,14 @@ def main():
     # Test dashboard
     tester.test_dashboard_stats()
     
-    # Test CRUD operations
+    # Test basic CRUD operations (needed for purchase tests)
     tester.test_categories_crud()
     tester.test_products_crud()
     tester.test_customers_crud()
     tester.test_suppliers_crud()
-    tester.test_sales_crud()
-    tester.test_orders_crud()
+    
+    # Test the main purchase and supplier invoice features
+    tester.test_purchase_features_complete()
     
     # Test reports
     tester.test_reports()
@@ -839,7 +840,7 @@ def main():
     tester.cleanup_test_data()
     
     # Print results
-    print("\n" + "=" * 50)
+    print("\n" + "=" * 70)
     print(f"📊 Test Results: {tester.tests_passed}/{tester.tests_run} passed")
     
     if tester.failed_tests:
