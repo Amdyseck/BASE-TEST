@@ -12,6 +12,7 @@ import POSPage from "./pages/POSPage";
 import OrdersPage from "./pages/OrdersPage";
 import ReportsPage from "./pages/ReportsPage";
 import UsersPage from "./pages/UsersPage";
+import DepotsPage from "./pages/DepotsPage";
 import InvoicePage from "./pages/InvoicePage";
 import Layout from "./components/Layout";
 import "./App.css";
@@ -63,6 +64,7 @@ function App() {
             <Route path="sales" element={<SalesPage />} />
             <Route path="pos" element={<POSPage />} />
             <Route path="orders" element={<OrdersPage />} />
+            <Route path="depots" element={<DepotsPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="users" element={
               <ProtectedRoute allowedRoles={["admin"]}>
