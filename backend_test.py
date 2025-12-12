@@ -496,6 +496,274 @@ class QuincaillerieAPITester:
         )
         return success
 
+    def test_depots_crud(self):
+        """Test depots CRUD operations"""
+        # Create depot
+        depot_data = {
+            "name": f"Dépôt Test {datetime.now().strftime('%H%M%S')}",
+            "address": "123 Rue Test, Dakar",
+            "description": "Dépôt de test pour les achats"
+        }
+        success, response = self.run_test(
+            "Create Depot",
+            "POST",
+            "depots",
+            200,
+            data=depot_data
+        )
+        if not success:
+            return False
+        
+        depot_id = response.get('id')
+        self.test_data['depot_id'] = depot_id
+
+        # Get depots
+        success, response = self.run_test(
+            "Get Depots",
+            "GET",
+            "depots",
+            200
+        )
+        return success
+
+    def test_purchase_order_with_depot(self):
+        """Test creating purchase order with depot selection"""
+        supplier_id = self.test_data.get('supplier_id')
+        depot_id = self.test_data.get('depot_id')
+        product_id = self.test_data.get('product_id')
+        
+        if not supplier_id or not depot_id or not product_id:
+            print("   Missing supplier, depot, or product for purchase order test")
+            return False
+
+        # Create purchase order with depot
+        order_data = {
+            "supplier_id": supplier_id,
+            "depot_id": depot_id,
+            "items": [{
+                "product_id": product_id,
+                "product_name": "Produit Achat Test",
+                "quantity": 10,
+                "unit_cost": 1000,
+                "total": 10000
+            }],
+            "payment_method": "especes",
+            "amount_paid": 0,
+            "notes": "Commande test avec dépôt"
+        }
+        
+        success, response = self.run_test(
+            "Create Purchase Order with Depot",
+            "POST",
+            "orders",
+            200,
+            data=order_data
+        )
+        
+        if success:
+            order_id = response.get('id')
+            depot_name = response.get('depot_name')
+            self.test_data['purchase_order_id'] = order_id
+            print(f"   Order created with depot: {depot_name}")
+            
+            # Verify order has depot_name
+            if not depot_name:
+                print("   Warning: Order created but depot_name is missing")
+                return False
+        
+        return success
+
+    def test_receive_order_with_depot(self):
+        """Test receiving order with depot assignment"""
+        order_id = self.test_data.get('purchase_order_id')
+        depot_id = self.test_data.get('depot_id')
+        
+        if not order_id or not depot_id:
+            print("   Missing order or depot for receive test")
+            return False
+
+        # First mark as ordered
+        success, response = self.run_test(
+            "Mark Order as Ordered",
+            "PUT",
+            f"orders/{order_id}/status?status=ordered",
+            200
+        )
+        if not success:
+            return False
+
+        # Then receive with depot
+        success, response = self.run_test(
+            "Receive Order with Depot",
+            "PUT",
+            f"orders/{order_id}/status?status=received&depot_id={depot_id}",
+            200
+        )
+        
+        if success:
+            # Verify stock was updated and products assigned to depot
+            product_id = self.test_data.get('product_id')
+            if product_id:
+                success_product, product_response = self.run_test(
+                    "Verify Product Stock and Depot Assignment",
+                    "GET",
+                    f"products/{product_id}",
+                    200
+                )
+                if success_product:
+                    print(f"   Product stock: {product_response.get('stock', 0)}")
+                    print(f"   Product depot_id: {product_response.get('depot_id', 'None')}")
+        
+        return success
+
+    def test_create_supplier_invoice(self):
+        """Test transforming order to supplier invoice"""
+        order_id = self.test_data.get('purchase_order_id')
+        
+        if not order_id:
+            print("   Missing order for supplier invoice test")
+            return False
+
+        # Transform order to supplier invoice
+        success, response = self.run_test(
+            "Transform Order to Supplier Invoice",
+            "POST",
+            f"orders/{order_id}/invoice",
+            200
+        )
+        
+        if success:
+            invoice_number = response.get('invoice_number')
+            invoice_id = response.get('invoice_id')
+            self.test_data['supplier_invoice_id'] = invoice_id
+            print(f"   Invoice created: {invoice_number}")
+            
+            # Verify invoice has FF- prefix
+            if not invoice_number or not invoice_number.startswith('FF-'):
+                print("   Warning: Invoice number doesn't have FF- prefix")
+                return False
+                
+            # Verify order is marked as invoiced
+            success_order, order_response = self.run_test(
+                "Verify Order is Invoiced",
+                "GET",
+                "orders",
+                200
+            )
+            if success_order:
+                order = next((o for o in order_response if o.get('id') == order_id), None)
+                if order and not order.get('is_invoiced'):
+                    print("   Warning: Order not marked as invoiced")
+                    return False
+        
+        return success
+
+    def test_pay_supplier_invoice(self):
+        """Test paying supplier invoice"""
+        invoice_id = self.test_data.get('supplier_invoice_id')
+        
+        if not invoice_id:
+            print("   Missing supplier invoice for payment test")
+            return False
+
+        # Get supplier invoices first
+        success, response = self.run_test(
+            "Get Supplier Invoices",
+            "GET",
+            "supplier-invoices",
+            200
+        )
+        if not success:
+            return False
+
+        # Make partial payment
+        success, response = self.run_test(
+            "Pay Supplier Invoice (Partial)",
+            "POST",
+            f"supplier-invoices/{invoice_id}/payment?amount=5000&payment_method=banque",
+            200
+        )
+        
+        if success:
+            balance_due = response.get('balance_due')
+            status = response.get('status')
+            print(f"   Payment processed. Balance due: {balance_due}, Status: {status}")
+            
+            # Verify bank journal has debit entry
+            success_bank, bank_response = self.run_test(
+                "Verify Bank Journal Entry",
+                "GET",
+                "bank-journal",
+                200
+            )
+            if success_bank:
+                entries = bank_response.get('entries', [])
+                debit_entries = [e for e in entries if e.get('entry_type') == 'debit']
+                if not debit_entries:
+                    print("   Warning: No debit entry found in bank journal")
+                else:
+                    print(f"   Bank journal has {len(debit_entries)} debit entries")
+        
+        return success
+
+    def test_balance_tracking(self):
+        """Test balance tracking for customers and suppliers"""
+        success, response = self.run_test(
+            "Get Balance Summary",
+            "GET",
+            "balances/summary",
+            200
+        )
+        
+        if success:
+            customer_balance = response.get('total_customer_balance', 0)
+            supplier_balance = response.get('total_supplier_balance', 0)
+            customers_with_balance = response.get('customers_with_balance', [])
+            suppliers_with_balance = response.get('suppliers_with_balance', [])
+            
+            print(f"   Total customer balance: {customer_balance}")
+            print(f"   Total supplier balance: {supplier_balance}")
+            print(f"   Customers with balance: {len(customers_with_balance)}")
+            print(f"   Suppliers with balance: {len(suppliers_with_balance)}")
+            
+            # Verify both customer and supplier balances are tracked
+            if 'total_customer_balance' not in response or 'total_supplier_balance' not in response:
+                print("   Warning: Missing balance tracking fields")
+                return False
+        
+        return success
+
+    def test_purchase_features_complete(self):
+        """Complete test of purchase and supplier invoice features"""
+        print("\n🛒 Testing Complete Purchase & Supplier Invoice Flow")
+        
+        # Test depots first
+        if not self.test_depots_crud():
+            return False
+            
+        # Test purchase order with depot
+        if not self.test_purchase_order_with_depot():
+            return False
+            
+        # Test receiving order with depot
+        if not self.test_receive_order_with_depot():
+            return False
+            
+        # Test creating supplier invoice
+        if not self.test_create_supplier_invoice():
+            return False
+            
+        # Test paying supplier invoice
+        if not self.test_pay_supplier_invoice():
+            return False
+            
+        # Test balance tracking
+        if not self.test_balance_tracking():
+            return False
+            
+        print("✅ All purchase and supplier invoice features working correctly")
+        return True
+
     def cleanup_test_data(self):
         """Clean up test data"""
         print("\n🧹 Cleaning up test data...")
