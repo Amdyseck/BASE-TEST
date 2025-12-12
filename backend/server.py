@@ -178,6 +178,7 @@ class OrderItem(BaseModel):
 
 class OrderBase(BaseModel):
     supplier_id: str
+    depot_id: str = ""  # Dépôt de destination
     items: List[OrderItem]
     payment_method: str = "especes"
     amount_paid: float = 0
@@ -188,11 +189,35 @@ class Order(OrderBase):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     order_number: str = ""
     supplier_name: str = ""
-    status: str = "pending"
+    depot_name: str = ""  # Nom du dépôt
+    status: str = "pending"  # pending, ordered, received, cancelled, invoiced
     total: float = 0
     balance_due: float = 0
+    is_invoiced: bool = False  # Transformé en facture définitive
+    invoice_number: Optional[str] = None  # Numéro de facture fournisseur
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     received_at: Optional[datetime] = None
+    invoiced_at: Optional[datetime] = None
+
+# Supplier Invoice model
+class SupplierInvoiceBase(BaseModel):
+    order_id: str
+    supplier_id: str
+    invoice_number: str
+    invoice_date: Optional[str] = None
+    payment_method: str = "especes"
+    amount_paid: float = 0
+    notes: Optional[str] = ""
+
+class SupplierInvoice(SupplierInvoiceBase):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    supplier_name: str = ""
+    items: List[OrderItem] = []
+    total: float = 0
+    balance_due: float = 0
+    status: str = "unpaid"  # unpaid, partial, paid
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # Payment model for tracking payments
 class PaymentBase(BaseModel):
