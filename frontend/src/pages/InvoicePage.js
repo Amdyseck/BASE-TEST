@@ -146,10 +146,6 @@ const InvoicePage = () => {
               <span className="text-slate-500">Sous-total</span>
               <span className="font-mono">{formatCurrency(sale.subtotal)}</span>
             </div>
-            <div className="flex justify-between py-2 border-b border-slate-100">
-              <span className="text-slate-500">TVA (18%)</span>
-              <span className="font-mono">{formatCurrency(sale.tax)}</span>
-            </div>
             {sale.discount > 0 && (
               <div className="flex justify-between py-2 border-b border-slate-100 text-green-600">
                 <span>Remise</span>
@@ -160,29 +156,36 @@ const InvoicePage = () => {
               <span className="font-bold">TOTAL</span>
               <span className="font-mono font-bold text-lg">{formatCurrency(sale.total)}</span>
             </div>
+            {sale.balance_due > 0 && (
+              <div className="flex justify-between py-2 text-orange-600">
+                <span>Reste à payer</span>
+                <span className="font-mono font-medium">{formatCurrency(sale.balance_due)}</span>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Payment info */}
         <div className="mt-8 pt-6 border-t border-slate-200">
           <div className="flex items-center gap-4">
-            <span className="overline">Mode de paiement:</span>
-            <span
-              className={`px-3 py-1 rounded-full text-sm font-medium ${
-                sale.payment_method === "cash"
-                  ? "bg-green-100 text-green-700"
-                  : sale.payment_method === "card"
-                  ? "bg-blue-100 text-blue-700"
-                  : "bg-yellow-100 text-yellow-700"
-              }`}
-            >
-              {sale.payment_method === "cash"
+            <span className="overline">Mode de règlement:</span>
+            <span className="px-3 py-1 rounded-full text-sm font-medium bg-slate-100 text-slate-700">
+              {sale.payment_method === "especes"
                 ? "Espèces"
-                : sale.payment_method === "card"
-                ? "Carte bancaire"
-                : "Crédit"}
+                : sale.payment_method === "wave"
+                ? "Wave"
+                : sale.payment_method === "orange_money"
+                ? "Orange Money"
+                : sale.payment_method === "cheque"
+                ? "Chèque"
+                : sale.payment_method}
             </span>
           </div>
+          {sale.amount_paid > 0 && (
+            <div className="mt-2 text-sm text-slate-500">
+              Montant reçu: {formatCurrency(sale.amount_paid)}
+            </div>
+          )}
         </div>
 
         {/* Footer */}
