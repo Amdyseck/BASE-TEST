@@ -1,36 +1,122 @@
-# Test Results - INTERTRADE TOUBA - Nouvelle session
+# Test Results - INTERTRADE TOUBA Purchase & Supplier Invoice Features
 
 ## Testing Scope
 Testing the new features for purchases and supplier invoices:
-1. Select destination depot for purchases and reception
-2. Transform supplier reception into definitive invoice
-3. "Commande" renamed to "Achat"
-4. Track supplier balance like customers
-5. Display depot on inventory and product pages
+1. Create Purchase Order with Depot selection
+2. Receive Order with Depot assignment
+3. Transform supplier reception into definitive invoice
+4. Pay supplier invoices with balance tracking
+5. Check balance tracking for both customers and suppliers
 
 ## Test Credentials
 - Email: admin@intertrade.sn
 - Password: admin123
+- API Base: https://intertrade-manager.preview.emergentagent.com/api
 
-## Backend Endpoints to Test
+backend:
+  - task: "Login Authentication"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "Initial test setup - needs authentication verification"
 
-### Orders (Achats)
-- POST /api/orders - Create order with depot_id
-- PUT /api/orders/{order_id}/status?status=received&depot_id=X - Receive with depot selection
-- POST /api/orders/{order_id}/invoice - Transform to supplier invoice
+  - task: "Create Purchase Order with Depot"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "Need to test POST /api/orders with depot_id field"
 
-### Supplier Invoices
-- GET /api/supplier-invoices - List all supplier invoices
-- GET /api/supplier-invoices/unpaid - List unpaid invoices
-- POST /api/supplier-invoices/{invoice_id}/payment?amount=X&payment_method=Y - Pay invoice
+  - task: "Receive Order with Depot"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "Need to test PUT /api/orders/{order_id}/status with depot assignment"
 
-### Balance Tracking
-- GET /api/balances/summary - Get customer and supplier balances
+  - task: "Create Supplier Invoice"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "Need to test POST /api/orders/{order_id}/invoice transformation"
 
-## Frontend Pages to Test
-1. /orders - Orders renamed to "Achats", with depot column and "Factures fournisseurs" tab
-2. /products - Products page with depot column
-3. /reports - Inventory tab with depot column
+  - task: "Pay Supplier Invoice"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "Need to test POST /api/supplier-invoices/{invoice_id}/payment"
 
-## Incorporate User Feedback
-None yet
+  - task: "Balance Tracking"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "Need to test GET /api/balances/summary for customer and supplier balances"
+
+frontend:
+  - task: "Frontend Testing"
+    implemented: false
+    working: "NA"
+    file: "N/A"
+    stuck_count: 0
+    priority: "low"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "Frontend testing not required per system limitations"
+
+metadata:
+  created_by: "testing_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Login Authentication"
+    - "Create Purchase Order with Depot"
+    - "Receive Order with Depot"
+    - "Create Supplier Invoice"
+    - "Pay Supplier Invoice"
+    - "Balance Tracking"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "testing"
+    message: "Starting comprehensive testing of purchase and supplier invoice features for INTERTRADE TOUBA"
