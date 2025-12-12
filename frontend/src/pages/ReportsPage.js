@@ -304,7 +304,7 @@ const ReportsPage = () => {
               <TableHeader className="table-header">
                 <TableRow>
                   <TableHead>Produit</TableHead>
-                  <TableHead>SKU</TableHead>
+                  <TableHead>Référence</TableHead>
                   <TableHead className="text-right">Stock</TableHead>
                   <TableHead className="text-right">Min</TableHead>
                   <TableHead className="text-right">Valeur</TableHead>
