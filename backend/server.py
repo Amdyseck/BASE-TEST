@@ -29,7 +29,7 @@ JWT_EXPIRATION_HOURS = 24
 security = HTTPBearer()
 
 # Create the main app
-app = FastAPI(title="Quincaillerie Pro API")
+app = FastAPI(title="INTERTRADE TOUBA API")
 api_router = APIRouter(prefix="/api")
 
 # ==================== MODELS ====================
@@ -38,7 +38,7 @@ class UserBase(BaseModel):
     model_config = ConfigDict(extra="ignore")
     email: EmailStr
     name: str
-    role: str = "vendeur"  # admin, vendeur, caissier
+    role: str = "vendeur"
 
 class UserCreate(UserBase):
     password: str
@@ -71,17 +71,29 @@ class Category(CategoryBase):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+# Depot (Warehouse) model
+class DepotBase(BaseModel):
+    name: str
+    address: Optional[str] = ""
+    description: Optional[str] = ""
+
+class Depot(DepotBase):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 class ProductBase(BaseModel):
     name: str
     sku: str
     barcode: Optional[str] = ""
-    category_id: str
+    category_id: Optional[str] = ""
+    depot_id: Optional[str] = ""
     price: float
     cost_price: float
     stock: int = 0
     min_stock: int = 5
     description: Optional[str] = ""
-    unit: str = "pièce"
+    unit: str = "kg"
 
 class Product(ProductBase):
     model_config = ConfigDict(extra="ignore")
@@ -94,6 +106,7 @@ class ProductUpdate(BaseModel):
     sku: Optional[str] = None
     barcode: Optional[str] = None
     category_id: Optional[str] = None
+    depot_id: Optional[str] = None
     price: Optional[float] = None
     cost_price: Optional[float] = None
     stock: Optional[int] = None
@@ -111,6 +124,7 @@ class Customer(CustomerBase):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     total_purchases: float = 0
+    balance: float = 0  # Positive = client doit, Negative = on doit au client
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class SupplierBase(BaseModel):
@@ -123,12 +137,13 @@ class SupplierBase(BaseModel):
 class Supplier(SupplierBase):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    balance: float = 0  # Positive = on doit au fournisseur, Negative = fournisseur doit
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class SaleItem(BaseModel):
     product_id: str
     product_name: str
-    quantity: int
+    quantity: float
     unit_price: float
     total: float
 
@@ -136,7 +151,8 @@ class SaleBase(BaseModel):
     items: List[SaleItem]
     customer_id: Optional[str] = None
     customer_name: Optional[str] = "Client Comptoir"
-    payment_method: str = "cash"  # cash, card, credit
+    payment_method: str = "especes"  # especes, wave, orange_money, cheque
+    amount_paid: float = 0
     discount: float = 0
     notes: Optional[str] = ""
 
@@ -145,8 +161,8 @@ class Sale(SaleBase):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     invoice_number: str = ""
     subtotal: float = 0
-    tax: float = 0
     total: float = 0
+    balance_due: float = 0  # Montant restant à payer
     cashier_id: str = ""
     cashier_name: str = ""
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -154,13 +170,15 @@ class Sale(SaleBase):
 class OrderItem(BaseModel):
     product_id: str
     product_name: str
-    quantity: int
+    quantity: float
     unit_cost: float
     total: float
 
 class OrderBase(BaseModel):
     supplier_id: str
     items: List[OrderItem]
+    payment_method: str = "especes"
+    amount_paid: float = 0
     notes: Optional[str] = ""
 
 class Order(OrderBase):
@@ -168,10 +186,27 @@ class Order(OrderBase):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     order_number: str = ""
     supplier_name: str = ""
-    status: str = "pending"  # pending, ordered, received, cancelled
+    status: str = "pending"
     total: float = 0
+    balance_due: float = 0
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     received_at: Optional[datetime] = None
+
+# Payment model for tracking payments
+class PaymentBase(BaseModel):
+    entity_type: str  # "customer" or "supplier"
+    entity_id: str
+    amount: float
+    payment_method: str = "especes"
+    reference: Optional[str] = ""
+    notes: Optional[str] = ""
+
+class Payment(PaymentBase):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    entity_name: str = ""
+    created_by: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class DashboardStats(BaseModel):
     total_products: int
@@ -180,6 +215,8 @@ class DashboardStats(BaseModel):
     total_sales_month: float
     total_customers: int
     total_suppliers: int
+    total_customer_balance: float
+    total_supplier_balance: float
     recent_sales: List[dict]
     low_stock_products: List[dict]
 
@@ -296,6 +333,44 @@ async def delete_user(user_id: str, user: dict = Depends(require_role(["admin"])
         raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
     return {"message": "Utilisateur supprimé"}
 
+# ==================== DEPOTS ROUTES ====================
+
+@api_router.post("/depots", response_model=Depot)
+async def create_depot(depot_data: DepotBase, user: dict = Depends(require_role(["admin", "vendeur"]))):
+    depot = Depot(**depot_data.model_dump())
+    doc = depot.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    await db.depots.insert_one(doc)
+    return depot
+
+@api_router.get("/depots", response_model=List[Depot])
+async def get_depots(user: dict = Depends(get_current_user)):
+    depots = await db.depots.find({}, {"_id": 0}).to_list(1000)
+    for d in depots:
+        if isinstance(d.get("created_at"), str):
+            d["created_at"] = datetime.fromisoformat(d["created_at"])
+    return depots
+
+@api_router.put("/depots/{depot_id}", response_model=Depot)
+async def update_depot(depot_id: str, depot_data: DepotBase, user: dict = Depends(require_role(["admin", "vendeur"]))):
+    result = await db.depots.update_one(
+        {"id": depot_id},
+        {"$set": depot_data.model_dump()}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Dépôt non trouvé")
+    updated = await db.depots.find_one({"id": depot_id}, {"_id": 0})
+    if isinstance(updated.get("created_at"), str):
+        updated["created_at"] = datetime.fromisoformat(updated["created_at"])
+    return Depot(**updated)
+
+@api_router.delete("/depots/{depot_id}")
+async def delete_depot(depot_id: str, user: dict = Depends(require_role(["admin"]))):
+    result = await db.depots.delete_one({"id": depot_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Dépôt non trouvé")
+    return {"message": "Dépôt supprimé"}
+
 # ==================== CATEGORIES ROUTES ====================
 
 @api_router.post("/categories", response_model=Category)
@@ -321,7 +396,7 @@ async def update_category(category_id: str, category_data: CategoryBase, user: d
         {"$set": category_data.model_dump()}
     )
     if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Catégorie non trouvée")
+        raise HTTPException(status_code=404, detail="Famille non trouvée")
     updated = await db.categories.find_one({"id": category_id}, {"_id": 0})
     if isinstance(updated.get("created_at"), str):
         updated["created_at"] = datetime.fromisoformat(updated["created_at"])
@@ -331,8 +406,8 @@ async def update_category(category_id: str, category_data: CategoryBase, user: d
 async def delete_category(category_id: str, user: dict = Depends(require_role(["admin"]))):
     result = await db.categories.delete_one({"id": category_id})
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Catégorie non trouvée")
-    return {"message": "Catégorie supprimée"}
+        raise HTTPException(status_code=404, detail="Famille non trouvée")
+    return {"message": "Famille supprimée"}
 
 # ==================== PRODUCTS ROUTES ====================
 
@@ -340,7 +415,7 @@ async def delete_category(category_id: str, user: dict = Depends(require_role(["
 async def create_product(product_data: ProductBase, user: dict = Depends(require_role(["admin", "vendeur"]))):
     existing = await db.products.find_one({"sku": product_data.sku})
     if existing:
-        raise HTTPException(status_code=400, detail="SKU déjà utilisé")
+        raise HTTPException(status_code=400, detail="Référence déjà utilisée")
     
     product = Product(**product_data.model_dump())
     doc = product.model_dump()
@@ -350,8 +425,22 @@ async def create_product(product_data: ProductBase, user: dict = Depends(require
     return product
 
 @api_router.get("/products", response_model=List[Product])
-async def get_products(user: dict = Depends(get_current_user)):
-    products = await db.products.find({}, {"_id": 0}).to_list(10000)
+async def get_products(
+    stock_filter: Optional[str] = None,
+    depot_id: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    query = {}
+    if depot_id:
+        query["depot_id"] = depot_id
+    if stock_filter == "low":
+        query["$expr"] = {"$lte": ["$stock", "$min_stock"]}
+    elif stock_filter == "available":
+        query["stock"] = {"$gt": 0}
+    elif stock_filter == "out":
+        query["stock"] = 0
+    
+    products = await db.products.find(query, {"_id": 0}).to_list(10000)
     for p in products:
         if isinstance(p.get("created_at"), str):
             p["created_at"] = datetime.fromisoformat(p["created_at"])
@@ -396,6 +485,17 @@ async def update_product(product_id: str, product_data: ProductUpdate, user: dic
     if isinstance(updated.get("updated_at"), str):
         updated["updated_at"] = datetime.fromisoformat(updated["updated_at"])
     return Product(**updated)
+
+@api_router.put("/products/{product_id}/stock")
+async def update_product_stock(product_id: str, stock: int, user: dict = Depends(require_role(["admin", "vendeur"]))):
+    """Update real stock (for inventory)"""
+    result = await db.products.update_one(
+        {"id": product_id}, 
+        {"$set": {"stock": stock, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Produit non trouvé")
+    return {"message": "Stock mis à jour"}
 
 @api_router.delete("/products/{product_id}")
 async def delete_product(product_id: str, user: dict = Depends(require_role(["admin"]))):
@@ -502,6 +602,81 @@ async def delete_supplier(supplier_id: str, user: dict = Depends(require_role(["
         raise HTTPException(status_code=404, detail="Fournisseur non trouvé")
     return {"message": "Fournisseur supprimé"}
 
+# ==================== PAYMENTS ROUTES ====================
+
+@api_router.post("/payments", response_model=Payment)
+async def create_payment(payment_data: PaymentBase, user: dict = Depends(get_current_user)):
+    """Create a payment for customer or supplier"""
+    entity_name = ""
+    
+    if payment_data.entity_type == "customer":
+        entity = await db.customers.find_one({"id": payment_data.entity_id}, {"_id": 0})
+        if not entity:
+            raise HTTPException(status_code=404, detail="Client non trouvé")
+        entity_name = entity["name"]
+        # Customer pays, reduce their balance
+        await db.customers.update_one(
+            {"id": payment_data.entity_id},
+            {"$inc": {"balance": -payment_data.amount}}
+        )
+    elif payment_data.entity_type == "supplier":
+        entity = await db.suppliers.find_one({"id": payment_data.entity_id}, {"_id": 0})
+        if not entity:
+            raise HTTPException(status_code=404, detail="Fournisseur non trouvé")
+        entity_name = entity["name"]
+        # We pay supplier, reduce our debt
+        await db.suppliers.update_one(
+            {"id": payment_data.entity_id},
+            {"$inc": {"balance": -payment_data.amount}}
+        )
+    else:
+        raise HTTPException(status_code=400, detail="Type d'entité invalide")
+    
+    payment = Payment(
+        **payment_data.model_dump(),
+        entity_name=entity_name,
+        created_by=user["name"]
+    )
+    doc = payment.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    await db.payments.insert_one(doc)
+    
+    return payment
+
+@api_router.get("/payments")
+async def get_payments(
+    entity_type: Optional[str] = None,
+    entity_id: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    query = {}
+    if entity_type:
+        query["entity_type"] = entity_type
+    if entity_id:
+        query["entity_id"] = entity_id
+    
+    payments = await db.payments.find(query, {"_id": 0}).sort("created_at", -1).to_list(10000)
+    return payments
+
+@api_router.get("/balances/summary")
+async def get_balances_summary(user: dict = Depends(get_current_user)):
+    """Get total balances for customers and suppliers"""
+    customers = await db.customers.find({}, {"_id": 0, "id": 1, "name": 1, "balance": 1}).to_list(10000)
+    suppliers = await db.suppliers.find({}, {"_id": 0, "id": 1, "name": 1, "balance": 1}).to_list(10000)
+    
+    total_customer_balance = sum(c.get("balance", 0) for c in customers)
+    total_supplier_balance = sum(s.get("balance", 0) for s in suppliers)
+    
+    customers_with_balance = [c for c in customers if c.get("balance", 0) != 0]
+    suppliers_with_balance = [s for s in suppliers if s.get("balance", 0) != 0]
+    
+    return {
+        "total_customer_balance": total_customer_balance,
+        "total_supplier_balance": total_supplier_balance,
+        "customers_with_balance": customers_with_balance,
+        "suppliers_with_balance": suppliers_with_balance
+    }
+
 # ==================== SALES ROUTES ====================
 
 async def generate_invoice_number():
@@ -511,10 +686,10 @@ async def generate_invoice_number():
 
 @api_router.post("/sales", response_model=Sale)
 async def create_sale(sale_data: SaleBase, user: dict = Depends(get_current_user)):
-    # Calculate totals
+    # Calculate totals (no TVA)
     subtotal = sum(item.total for item in sale_data.items)
-    tax = subtotal * 0.18  # 18% TVA
-    total = subtotal + tax - sale_data.discount
+    total = subtotal - sale_data.discount
+    balance_due = total - sale_data.amount_paid
     
     # Generate invoice number
     invoice_number = await generate_invoice_number()
@@ -523,8 +698,8 @@ async def create_sale(sale_data: SaleBase, user: dict = Depends(get_current_user
         **sale_data.model_dump(),
         invoice_number=invoice_number,
         subtotal=round(subtotal, 2),
-        tax=round(tax, 2),
         total=round(total, 2),
+        balance_due=round(balance_due, 2),
         cashier_id=user["id"],
         cashier_name=user["name"]
     )
@@ -536,8 +711,13 @@ async def create_sale(sale_data: SaleBase, user: dict = Depends(get_current_user
             {"$inc": {"stock": -item.quantity}}
         )
     
-    # Update customer total purchases if applicable
-    if sale_data.customer_id:
+    # Update customer balance if there's remaining amount
+    if sale_data.customer_id and balance_due > 0:
+        await db.customers.update_one(
+            {"id": sale_data.customer_id},
+            {"$inc": {"balance": balance_due, "total_purchases": total}}
+        )
+    elif sale_data.customer_id:
         await db.customers.update_one(
             {"id": sale_data.customer_id},
             {"$inc": {"total_purchases": total}}
@@ -591,14 +771,23 @@ async def create_order(order_data: OrderBase, user: dict = Depends(require_role(
         raise HTTPException(status_code=404, detail="Fournisseur non trouvé")
     
     total = sum(item.total for item in order_data.items)
+    balance_due = total - order_data.amount_paid
     order_number = await generate_order_number()
     
     order = Order(
         **order_data.model_dump(),
         order_number=order_number,
         supplier_name=supplier["name"],
-        total=round(total, 2)
+        total=round(total, 2),
+        balance_due=round(balance_due, 2)
     )
+    
+    # Update supplier balance if there's remaining amount
+    if balance_due > 0:
+        await db.suppliers.update_one(
+            {"id": order_data.supplier_id},
+            {"$inc": {"balance": balance_due}}
+        )
     
     doc = order.model_dump()
     doc["created_at"] = doc["created_at"].isoformat()
@@ -671,6 +860,12 @@ async def get_dashboard_stats(user: dict = Depends(get_current_user)):
     total_customers = await db.customers.count_documents({})
     total_suppliers = await db.suppliers.count_documents({})
     
+    # Get balances
+    customers = await db.customers.find({}, {"_id": 0, "balance": 1}).to_list(10000)
+    suppliers = await db.suppliers.find({}, {"_id": 0, "balance": 1}).to_list(10000)
+    total_customer_balance = sum(c.get("balance", 0) for c in customers)
+    total_supplier_balance = sum(s.get("balance", 0) for s in suppliers)
+    
     # Get recent sales
     recent_sales = await db.sales.find({}, {"_id": 0}).sort("created_at", -1).limit(5).to_list(5)
     
@@ -687,6 +882,8 @@ async def get_dashboard_stats(user: dict = Depends(get_current_user)):
         total_sales_month=round(total_sales_month, 2),
         total_customers=total_customers,
         total_suppliers=total_suppliers,
+        total_customer_balance=round(total_customer_balance, 2),
+        total_supplier_balance=round(total_supplier_balance, 2),
         recent_sales=recent_sales,
         low_stock_products=low_stock_products
     )
@@ -709,22 +906,36 @@ async def get_sales_report(
     sales = await db.sales.find(query, {"_id": 0}).sort("created_at", -1).to_list(10000)
     
     total_revenue = sum(s.get("total", 0) for s in sales)
-    total_tax = sum(s.get("tax", 0) for s in sales)
     total_discount = sum(s.get("discount", 0) for s in sales)
+    total_balance_due = sum(s.get("balance_due", 0) for s in sales)
     
     return {
         "sales": sales,
         "summary": {
             "total_sales": len(sales),
             "total_revenue": round(total_revenue, 2),
-            "total_tax": round(total_tax, 2),
-            "total_discount": round(total_discount, 2)
+            "total_discount": round(total_discount, 2),
+            "total_balance_due": round(total_balance_due, 2)
         }
     }
 
 @api_router.get("/reports/inventory")
-async def get_inventory_report(user: dict = Depends(get_current_user)):
-    products = await db.products.find({}, {"_id": 0}).to_list(10000)
+async def get_inventory_report(
+    stock_filter: Optional[str] = None,
+    depot_id: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    query = {}
+    if depot_id:
+        query["depot_id"] = depot_id
+    if stock_filter == "low":
+        query["$expr"] = {"$lte": ["$stock", "$min_stock"]}
+    elif stock_filter == "available":
+        query["stock"] = {"$gt": 0}
+    elif stock_filter == "out":
+        query["stock"] = 0
+    
+    products = await db.products.find(query, {"_id": 0}).to_list(10000)
     
     total_value = sum(p.get("stock", 0) * p.get("cost_price", 0) for p in products)
     total_retail_value = sum(p.get("stock", 0) * p.get("price", 0) for p in products)
@@ -745,7 +956,7 @@ async def get_inventory_report(user: dict = Depends(get_current_user)):
 # Root endpoint
 @api_router.get("/")
 async def root():
-    return {"message": "Quincaillerie Pro API v1.0"}
+    return {"message": "INTERTRADE TOUBA API v1.0"}
 
 # Include router
 app.include_router(api_router)
