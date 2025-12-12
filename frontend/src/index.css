@@ -151,3 +151,20 @@ code {
         display: contents !important;
     }
 }
+
+/* Hide Emergent badge */
+[data-testid="emergent-badge"],
+a[href*="emergent"],
+div[class*="emergent"],
+.emergent-badge,
+#emergent-badge {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+}
+
+/* Alternative: hide fixed position badges at bottom right */
+body > div[style*="fixed"][style*="bottom"][style*="right"]:not(#root):not(.main-content),
+body > a[style*="fixed"][style*="bottom"][style*="right"] {
+    display: none !important;
+}
