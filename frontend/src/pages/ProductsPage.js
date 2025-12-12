@@ -176,6 +176,11 @@ const ProductsPage = () => {
     return category?.name || "-";
   };
 
+  const getDepotName = (depotId) => {
+    const depot = depots.find((d) => d.id === depotId);
+    return depot?.name || "-";
+  };
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("fr-FR", {
       style: "currency",
