@@ -196,7 +196,7 @@ class Order(OrderBase):
 
 # Payment model for tracking payments
 class PaymentBase(BaseModel):
-    entity_type: str  # "customer" or "supplier"
+    entity_type: str  # "customer" or "supplier" or "sale"
     entity_id: str
     amount: float
     payment_method: str = "especes"
@@ -209,6 +209,30 @@ class Payment(PaymentBase):
     entity_name: str = ""
     created_by: str = ""
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+# Bank Journal Entry model
+class BankJournalEntryBase(BaseModel):
+    description: str
+    amount: float
+    entry_type: str = "credit"  # credit (entrée), debit (sortie)
+    reference: Optional[str] = ""
+    payment_method: str = "banque"
+    related_entity_type: Optional[str] = None  # customer, supplier, sale
+    related_entity_id: Optional[str] = None
+    notes: Optional[str] = ""
+
+class BankJournalEntry(BankJournalEntryBase):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    created_by: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+# User Update model for admin
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    role: Optional[str] = None
+    password: Optional[str] = None
 
 class DashboardStats(BaseModel):
     total_products: int
