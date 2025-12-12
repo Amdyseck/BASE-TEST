@@ -15,7 +15,7 @@ import {
   LogOut,
   Menu,
   X,
-  Wrench,
+  Leaf,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import {
@@ -67,12 +67,12 @@ const Layout = () => {
       <aside className={`sidebar ${sidebarOpen ? "open" : ""}`} data-testid="sidebar">
         <div className="p-4 border-b border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-orange-500 rounded-sm flex items-center justify-center">
-              <Wrench className="w-6 h-6 text-white" />
+            <div className="w-10 h-10 bg-green-600 rounded-sm flex items-center justify-center">
+              <Leaf className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="font-bold text-lg font-[Chivo] tracking-tight">Gora MBAYE</h1>
-              <p className="text-xs text-slate-400">Quincaillerie</p>
+              <h1 className="font-bold text-lg font-[Chivo] tracking-tight">INTERTRADE</h1>
+              <p className="text-xs text-slate-400">TOUBA</p>
             </div>
           </div>
         </div>
