@@ -57,6 +57,7 @@ const ProductsPage = () => {
   useEffect(() => {
     fetchProducts();
     fetchCategories();
+    fetchDepots();
   }, []);
 
   const fetchProducts = async () => {
@@ -76,6 +77,15 @@ const ProductsPage = () => {
       setCategories(response.data);
     } catch (error) {
       console.error("Error fetching categories:", error);
+    }
+  };
+
+  const fetchDepots = async () => {
+    try {
+      const response = await api.get("/depots");
+      setDepots(response.data);
+    } catch (error) {
+      console.error("Error fetching depots:", error);
     }
   };
 
