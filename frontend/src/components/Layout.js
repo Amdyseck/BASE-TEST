@@ -16,6 +16,7 @@ import {
   Menu,
   X,
   Warehouse,
+  Landmark,
   Leaf,
 } from "lucide-react";
 import { Button } from "./ui/button";
