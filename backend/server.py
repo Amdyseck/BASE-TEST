@@ -810,6 +810,242 @@ async def get_sale_by_invoice(invoice_number: str, user: dict = Depends(get_curr
         sale["created_at"] = datetime.fromisoformat(sale["created_at"])
     return sale
 
+# ==================== SALE PAYMENT ROUTES ====================
+
+@api_router.post("/sales/{sale_id}/payment")
+async def add_sale_payment(sale_id: str, amount: float, payment_method: str = "especes", user: dict = Depends(get_current_user)):
+    """Add a partial payment to a sale"""
+    sale = await db.sales.find_one({"id": sale_id}, {"_id": 0})
+    if not sale:
+        raise HTTPException(status_code=404, detail="Vente non trouvée")
+    
+    if sale.get("status") == "cancelled":
+        raise HTTPException(status_code=400, detail="Impossible de payer une facture annulée")
+    
+    new_amount_paid = sale.get("amount_paid", 0) + amount
+    new_balance_due = sale.get("total", 0) - new_amount_paid
+    is_paid = new_balance_due <= 0
+    
+    # Update sale
+    await db.sales.update_one(
+        {"id": sale_id},
+        {"$set": {
+            "amount_paid": new_amount_paid,
+            "balance_due": max(0, new_balance_due),
+            "is_paid": is_paid
+        }}
+    )
+    
+    # Update customer balance if applicable
+    if sale.get("customer_id"):
+        await db.customers.update_one(
+            {"id": sale["customer_id"]},
+            {"$inc": {"balance": -amount}}
+        )
+    
+    # Create payment record
+    payment = Payment(
+        entity_type="sale",
+        entity_id=sale_id,
+        entity_name=sale.get("invoice_number", ""),
+        amount=amount,
+        payment_method=payment_method,
+        created_by=user["name"]
+    )
+    doc = payment.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    await db.payments.insert_one(doc)
+    
+    # Add to bank journal if payment is by bank
+    if payment_method == "banque":
+        bank_entry = BankJournalEntry(
+            description=f"Règlement facture {sale.get('invoice_number', '')}",
+            amount=amount,
+            entry_type="credit",
+            payment_method="banque",
+            related_entity_type="sale",
+            related_entity_id=sale_id,
+            created_by=user["name"]
+        )
+        bank_doc = bank_entry.model_dump()
+        bank_doc["created_at"] = bank_doc["created_at"].isoformat()
+        await db.bank_journal.insert_one(bank_doc)
+    
+    return {"message": "Paiement enregistré", "balance_due": max(0, new_balance_due), "is_paid": is_paid}
+
+@api_router.get("/sales/unpaid/list")
+async def get_unpaid_sales(user: dict = Depends(get_current_user)):
+    """Get all unpaid sales"""
+    sales = await db.sales.find(
+        {"$and": [{"balance_due": {"$gt": 0}}, {"status": {"$ne": "cancelled"}}]},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(10000)
+    return sales
+
+@api_router.post("/sales/{sale_id}/cancel")
+async def cancel_sale(sale_id: str, user: dict = Depends(require_role(["admin"]))):
+    """Cancel a sale and restore stock"""
+    sale = await db.sales.find_one({"id": sale_id}, {"_id": 0})
+    if not sale:
+        raise HTTPException(status_code=404, detail="Vente non trouvée")
+    
+    if sale.get("status") == "cancelled":
+        raise HTTPException(status_code=400, detail="Facture déjà annulée")
+    
+    # Restore stock for each item
+    for item in sale.get("items", []):
+        await db.products.update_one(
+            {"id": item["product_id"]},
+            {"$inc": {"stock": item["quantity"]}}
+        )
+    
+    # Reverse customer balance if applicable
+    if sale.get("customer_id"):
+        balance_change = sale.get("balance_due", 0)
+        await db.customers.update_one(
+            {"id": sale["customer_id"]},
+            {"$inc": {"balance": -balance_change, "total_purchases": -sale.get("total", 0)}}
+        )
+    
+    # Update sale status
+    await db.sales.update_one(
+        {"id": sale_id},
+        {"$set": {"status": "cancelled"}}
+    )
+    
+    return {"message": "Facture annulée et stock restauré"}
+
+@api_router.post("/sales/{sale_id}/return")
+async def return_sale_items(sale_id: str, items: List[dict], user: dict = Depends(get_current_user)):
+    """Return specific items from a sale (partial or full return)"""
+    sale = await db.sales.find_one({"id": sale_id}, {"_id": 0})
+    if not sale:
+        raise HTTPException(status_code=404, detail="Vente non trouvée")
+    
+    if sale.get("status") == "cancelled":
+        raise HTTPException(status_code=400, detail="Impossible de retourner une facture annulée")
+    
+    total_return = 0
+    
+    for return_item in items:
+        product_id = return_item.get("product_id")
+        return_qty = return_item.get("quantity", 0)
+        
+        # Find the original item
+        original_item = next((i for i in sale.get("items", []) if i["product_id"] == product_id), None)
+        if not original_item:
+            continue
+        
+        if return_qty > original_item["quantity"]:
+            return_qty = original_item["quantity"]
+        
+        # Restore stock
+        await db.products.update_one(
+            {"id": product_id},
+            {"$inc": {"stock": return_qty}}
+        )
+        
+        total_return += return_qty * original_item["unit_price"]
+    
+    # Update sale totals
+    new_total = sale.get("total", 0) - total_return
+    new_balance_due = new_total - sale.get("amount_paid", 0)
+    
+    if new_total <= 0:
+        # Full return, cancel the sale
+        await db.sales.update_one(
+            {"id": sale_id},
+            {"$set": {"status": "returned", "total": 0, "balance_due": 0}}
+        )
+    else:
+        await db.sales.update_one(
+            {"id": sale_id},
+            {"$set": {"total": new_total, "balance_due": max(0, new_balance_due), "status": "returned"}}
+        )
+    
+    # Update customer balance if applicable
+    if sale.get("customer_id") and total_return > 0:
+        await db.customers.update_one(
+            {"id": sale["customer_id"]},
+            {"$inc": {"balance": -min(total_return, sale.get("balance_due", 0)), "total_purchases": -total_return}}
+        )
+    
+    return {"message": "Retour enregistré", "total_returned": total_return}
+
+# ==================== BANK JOURNAL ROUTES ====================
+
+@api_router.post("/bank-journal", response_model=BankJournalEntry)
+async def create_bank_entry(entry_data: BankJournalEntryBase, user: dict = Depends(get_current_user)):
+    """Create a bank journal entry"""
+    entry = BankJournalEntry(**entry_data.model_dump(), created_by=user["name"])
+    doc = entry.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    await db.bank_journal.insert_one(doc)
+    return entry
+
+@api_router.get("/bank-journal")
+async def get_bank_journal(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    """Get bank journal entries"""
+    query = {}
+    if start_date:
+        query["created_at"] = {"$gte": start_date}
+    if end_date:
+        if "created_at" in query:
+            query["created_at"]["$lte"] = end_date
+        else:
+            query["created_at"] = {"$lte": end_date}
+    
+    entries = await db.bank_journal.find(query, {"_id": 0}).sort("created_at", -1).to_list(10000)
+    
+    total_credits = sum(e.get("amount", 0) for e in entries if e.get("entry_type") == "credit")
+    total_debits = sum(e.get("amount", 0) for e in entries if e.get("entry_type") == "debit")
+    
+    return {
+        "entries": entries,
+        "summary": {
+            "total_entries": len(entries),
+            "total_credits": round(total_credits, 2),
+            "total_debits": round(total_debits, 2),
+            "balance": round(total_credits - total_debits, 2)
+        }
+    }
+
+@api_router.delete("/bank-journal/{entry_id}")
+async def delete_bank_entry(entry_id: str, user: dict = Depends(require_role(["admin"]))):
+    result = await db.bank_journal.delete_one({"id": entry_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Écriture non trouvée")
+    return {"message": "Écriture supprimée"}
+
+# ==================== STOCK TO DEPOT ASSIGNMENT ====================
+
+@api_router.post("/products/assign-depot")
+async def assign_products_to_depot(depot_id: str, product_ids: Optional[List[str]] = None, user: dict = Depends(require_role(["admin", "vendeur"]))):
+    """Assign products to a depot. If product_ids is None, assign all products without depot."""
+    # Verify depot exists
+    depot = await db.depots.find_one({"id": depot_id}, {"_id": 0})
+    if not depot:
+        raise HTTPException(status_code=404, detail="Dépôt non trouvé")
+    
+    if product_ids:
+        # Assign specific products
+        result = await db.products.update_many(
+            {"id": {"$in": product_ids}},
+            {"$set": {"depot_id": depot_id, "updated_at": datetime.now(timezone.utc).isoformat()}}
+        )
+    else:
+        # Assign all products without depot
+        result = await db.products.update_many(
+            {"$or": [{"depot_id": ""}, {"depot_id": None}, {"depot_id": {"$exists": False}}]},
+            {"$set": {"depot_id": depot_id, "updated_at": datetime.now(timezone.utc).isoformat()}}
+        )
+    
+    return {"message": f"{result.modified_count} produit(s) affecté(s) au dépôt {depot['name']}"}
+
 # ==================== ORDERS ROUTES ====================
 
 async def generate_order_number():
