@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import api from "../lib/api";
 import { Button } from "../components/ui/button";
 import { toast } from "sonner";
-import { Printer, ArrowLeft, Wrench } from "lucide-react";
+import { Printer, ArrowLeft, Leaf } from "lucide-react";
 
 const InvoicePage = () => {
   const { saleId } = useParams();
@@ -88,12 +88,12 @@ const InvoicePage = () => {
         <div className="invoice-header">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-slate-900 rounded-sm flex items-center justify-center">
-                <Wrench className="w-7 h-7 text-white" />
+              <div className="w-12 h-12 bg-green-600 rounded-sm flex items-center justify-center">
+                <Leaf className="w-7 h-7 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold font-[Chivo] text-slate-900">Quincaillerie Gora MBAYE</h1>
-                <p className="text-sm text-slate-500">Votre partenaire en quincaillerie</p>
+                <h1 className="text-xl font-bold font-[Chivo] text-slate-900">INTERTRADE TOUBA</h1>
+                <p className="text-sm text-slate-500">Vos produits alimentaires de qualité</p>
               </div>
             </div>
             <div className="text-right">
@@ -188,7 +188,7 @@ const InvoicePage = () => {
         {/* Footer */}
         <div className="mt-8 pt-6 border-t border-slate-200 text-center text-sm text-slate-500">
           <p>Merci pour votre achat!</p>
-          <p className="mt-1">Quincaillerie Gora MBAYE - Votre satisfaction est notre priorité</p>
+          <p className="mt-1">INTERTRADE TOUBA - Vos produits alimentaires de qualité</p>
           <p className="mt-2 text-xs">Développé par Amdy SECK - 77 571 93 98</p>
         </div>
       </div>
