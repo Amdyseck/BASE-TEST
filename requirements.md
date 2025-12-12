@@ -1,11 +1,12 @@
-# Quincaillerie Pro - Logiciel de Gestion
+# INTERTRADE TOUBA - Logiciel de Gestion de Produits Alimentaires
 
 ## Problème Initial
-Créer un logiciel de gestion de quincaillerie complet avec:
-- Gestion des produits (inventaire, catégories, prix, codes-barres)
+Créer un logiciel de gestion de produits alimentaires complet avec:
+- Gestion des produits (inventaire, familles, prix, références)
 - Gestion des ventes/caisse (POS)
 - Gestion des fournisseurs et commandes
 - Gestion des clients
+- Gestion des dépôts de stockage
 - Rapports et statistiques
 - Plusieurs utilisateurs avec rôles (admin, vendeur, caissier)
 - Alertes de stock bas
