@@ -341,6 +341,34 @@ async def get_users(user: dict = Depends(require_role(["admin"]))):
     users = await db.users.find({}, {"_id": 0, "password": 0}).to_list(1000)
     return [UserResponse(**u) for u in users]
 
+@api_router.put("/users/{user_id}")
+async def update_user(user_id: str, user_data: UserUpdate, user: dict = Depends(require_role(["admin"]))):
+    """Update user info including password reset"""
+    update_dict = {}
+    
+    if user_data.name:
+        update_dict["name"] = user_data.name
+    if user_data.email:
+        # Check if email is already used by another user
+        existing = await db.users.find_one({"email": user_data.email, "id": {"$ne": user_id}})
+        if existing:
+            raise HTTPException(status_code=400, detail="Email déjà utilisé")
+        update_dict["email"] = user_data.email
+    if user_data.role:
+        if user_data.role not in ["admin", "vendeur", "caissier"]:
+            raise HTTPException(status_code=400, detail="Rôle invalide")
+        update_dict["role"] = user_data.role
+    if user_data.password:
+        update_dict["password"] = hash_password(user_data.password)
+    
+    if not update_dict:
+        raise HTTPException(status_code=400, detail="Aucune donnée à mettre à jour")
+    
+    result = await db.users.update_one({"id": user_id}, {"$set": update_dict})
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+    return {"message": "Utilisateur mis à jour"}
+
 @api_router.put("/users/{user_id}/role")
 async def update_user_role(user_id: str, role: str, user: dict = Depends(require_role(["admin"]))):
     if role not in ["admin", "vendeur", "caissier"]:
