@@ -387,7 +387,7 @@ const ProductsPage = () => {
                 <SelectValue placeholder="Famille" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Toutes les catégories</SelectItem>
+                <SelectItem value="all">Toutes les familles</SelectItem>
                 {categories.map((cat) => (
                   <SelectItem key={cat.id} value={cat.id}>
                     {cat.name}
