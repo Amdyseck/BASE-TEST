@@ -28,7 +28,7 @@ import {
   TableRow,
 } from "../components/ui/table";
 import { toast } from "sonner";
-import { Plus, Search, Edit, Trash2, Package, Barcode } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Package, Barcode, Warehouse } from "lucide-react";
 
 const ProductsPage = () => {
   const { isAdmin, isVendeur } = useAuth();
