@@ -39,10 +39,10 @@ const LoginPage = () => {
       <div
         className="login-image"
         style={{
-          backgroundImage: `url('https://images.unsplash.com/photo-1661338148448-c12887abcd47?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzR8MHwxfHNlYXJjaHwzfHxtb2Rlcm4lMjBoYXJkd2FyZSUyMHN0b3JlJTIwaW50ZXJpb3IlMjBzaGVsdmVzJTIwdG9vbHN8ZW58MHx8fHwxNzY1NDcwODg1fDA&ixlib=rb-4.1.0&q=85')`,
+          backgroundImage: `url('https://images.pexels.com/photos/1363850/pexels-photo-1363850.jpeg')`,
         }}
       >
-        <div className="w-full h-full bg-slate-900/60 flex items-center justify-center p-12">
+        <div className="w-full h-full bg-green-900/60 flex items-center justify-center p-12">
           <div className="text-center text-white">
             <div className="w-20 h-20 bg-green-600 rounded-sm mx-auto mb-6 flex items-center justify-center">
               <Leaf className="w-12 h-12" />
