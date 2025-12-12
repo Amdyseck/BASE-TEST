@@ -66,6 +66,7 @@ function App() {
             <Route path="pos" element={<POSPage />} />
             <Route path="orders" element={<OrdersPage />} />
             <Route path="depots" element={<DepotsPage />} />
+            <Route path="bank-journal" element={<BankJournalPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="users" element={
               <ProtectedRoute allowedRoles={["admin"]}>
