@@ -232,6 +232,7 @@ const POSPage = () => {
     { value: "wave", label: "Wave", icon: Smartphone },
     { value: "orange_money", label: "Orange Money", icon: Smartphone },
     { value: "cheque", label: "Chèque", icon: CreditCard },
+    { value: "banque", label: "Banque", icon: CreditCard },
   ];
 
   if (loading) {
