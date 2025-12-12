@@ -152,12 +152,13 @@ const ProductsPage = () => {
       sku: "",
       barcode: "",
       category_id: "",
+      depot_id: "",
       price: "",
       cost_price: "",
       stock: "",
       min_stock: "5",
       description: "",
-      unit: "pièce",
+      unit: "kg",
     });
   };
 
