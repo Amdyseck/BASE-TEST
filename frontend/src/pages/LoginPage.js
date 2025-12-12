@@ -44,8 +44,12 @@ const LoginPage = () => {
       >
         <div className="w-full h-full bg-green-900/60 flex items-center justify-center p-12">
           <div className="text-center text-white">
-            <div className="w-20 h-20 bg-green-600 rounded-sm mx-auto mb-6 flex items-center justify-center">
-              <Leaf className="w-12 h-12" />
+            <div className="w-20 h-20 rounded-sm mx-auto mb-6 flex items-center justify-center overflow-hidden">
+              <img 
+                src="https://customer-assets.emergentagent.com/job_quincaillerie-pro-6/artifacts/fudv1hmp_inter.jpg" 
+                alt="INTERTRADE TOUBA" 
+                className="w-full h-full object-cover"
+              />
             </div>
             <h1 className="text-4xl font-bold font-[Chivo] tracking-tight mb-4">
               INTERTRADE TOUBA

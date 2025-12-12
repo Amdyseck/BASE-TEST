@@ -69,9 +69,11 @@ const Layout = () => {
       <aside className={`sidebar ${sidebarOpen ? "open" : ""}`} data-testid="sidebar">
         <div className="p-4 border-b border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-green-600 rounded-sm flex items-center justify-center">
-              <Leaf className="w-6 h-6 text-white" />
-            </div>
+            <img 
+              src="https://customer-assets.emergentagent.com/job_quincaillerie-pro-6/artifacts/fudv1hmp_inter.jpg" 
+              alt="INTERTRADE TOUBA" 
+              className="w-12 h-12 rounded-sm object-cover"
+            />
             <div>
               <h1 className="font-bold text-lg font-[Chivo] tracking-tight">INTERTRADE</h1>
               <p className="text-xs text-slate-400">TOUBA</p>

@@ -88,9 +88,11 @@ const InvoicePage = () => {
         <div className="invoice-header">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-green-600 rounded-sm flex items-center justify-center">
-                <Leaf className="w-7 h-7 text-white" />
-              </div>
+              <img 
+                src="https://customer-assets.emergentagent.com/job_quincaillerie-pro-6/artifacts/fudv1hmp_inter.jpg" 
+                alt="INTERTRADE TOUBA" 
+                className="w-14 h-14 rounded-sm object-cover"
+              />
               <div>
                 <h1 className="text-xl font-bold font-[Chivo] text-slate-900">INTERTRADE TOUBA</h1>
                 <p className="text-sm text-slate-500">Vos produits alimentaires de qualité</p>
