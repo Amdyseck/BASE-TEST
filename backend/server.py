@@ -744,6 +744,7 @@ async def create_sale(sale_data: SaleBase, user: dict = Depends(get_current_user
     subtotal = sum(item.total for item in sale_data.items)
     total = subtotal - sale_data.discount
     balance_due = total - sale_data.amount_paid
+    is_paid = balance_due <= 0
     
     # Generate invoice number
     invoice_number = await generate_invoice_number()
@@ -753,7 +754,9 @@ async def create_sale(sale_data: SaleBase, user: dict = Depends(get_current_user
         invoice_number=invoice_number,
         subtotal=round(subtotal, 2),
         total=round(total, 2),
-        balance_due=round(balance_due, 2),
+        balance_due=round(max(0, balance_due), 2),
+        is_paid=is_paid,
+        status="active",
         cashier_id=user["id"],
         cashier_name=user["name"]
     )
@@ -781,6 +784,21 @@ async def create_sale(sale_data: SaleBase, user: dict = Depends(get_current_user
     doc["created_at"] = doc["created_at"].isoformat()
     doc["items"] = [item.model_dump() for item in sale_data.items]
     await db.sales.insert_one(doc)
+    
+    # Add to bank journal if payment is by bank
+    if sale_data.payment_method == "banque" and sale_data.amount_paid > 0:
+        bank_entry = BankJournalEntry(
+            description=f"Vente {invoice_number}",
+            amount=sale_data.amount_paid,
+            entry_type="credit",
+            payment_method="banque",
+            related_entity_type="sale",
+            related_entity_id=sale.id,
+            created_by=user["name"]
+        )
+        bank_doc = bank_entry.model_dump()
+        bank_doc["created_at"] = bank_doc["created_at"].isoformat()
+        await db.bank_journal.insert_one(bank_doc)
     
     return sale
 
