@@ -19,6 +19,10 @@ Contrainte : ne pas traduire WAVE, Orange Money, etc. Langue : français.
 - 2026-06 : Paramètres société (`/settings`, admin) : nom, slogan, adresse, tél, email, NINEA, RC, pied de facture, logo téléversé (Emergent Object Storage) → sidebar, login, factures, relevés
 - 2026-06 : Couleurs des modes de paiement (Espèces vert, WAVE bleu, Orange Money orange, Chèque slate, Banque indigo) sur POS/Ventes/Achats + badges ; boîte de dialogue de confirmation (AlertDialog) pour toutes les suppressions/annulations ; bouton « Nouvelle facture » sur la facture
 
+- 2026-06 : Rôles Admin / **Gérant** / Vendeur / **Caissier** (caissier : aucune vente, encaissements + caisse uniquement). Autorisations fines par utilisateur (modules cochés, peut supprimer, peut annuler facture, peut modifier prix, plafond de remise %) éditées par admin/gérant dans Utilisateurs. Gérant : pas d'accès aux Paramètres ni aux comptes admin. Contrôles côté backend (require_module/require_perm, remise/prix contrôlés à la vente) + menus/routes filtrés côté frontend.
+- 2026-06 : Journal d'audit « Historique » (`/audit`, admin/gérant) : créations/modifications/suppressions/annulations avec avant/après, filtres utilisateur/module/action/période.
+- 2026-06 : Écran Facturation en 3 colonnes (règlement | facture avec lignes qté/PU modifiables | liste d'articles une par ligne avec recherche et code-barres).
+
 ## Backlog
 - P2 : découper `server.py` en routers modulaires
 - P2 : tests frontend automatisés
