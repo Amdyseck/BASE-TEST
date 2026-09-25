@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -22,14 +22,14 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 # JWT Settings
-JWT_SECRET = os.environ.get('JWT_SECRET', 'intertrade-touba-secret-key-2024')
+JWT_SECRET = os.environ.get('JWT_SECRET', 'wakeur-khadim-rassoul-secret-key-2024')
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
 
 security = HTTPBearer()
 
 # Create the main app
-app = FastAPI(title="INTERTRADE TOUBA API")
+app = FastAPI(title="Wakeur Khadim Rassoul SECK et FRERES API")
 api_router = APIRouter(prefix="/api")
 
 # ==================== MODELS ====================
@@ -1432,7 +1432,7 @@ async def get_inventory_report(
 # Root endpoint
 @api_router.get("/")
 async def root():
-    return {"message": "INTERTRADE TOUBA API v1.0"}
+    return {"message": "Wakeur Khadim Rassoul SECK et FRERES API v1.0"}
 
 # Include router
 app.include_router(api_router)

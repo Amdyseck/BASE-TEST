@@ -46,13 +46,13 @@ const LoginPage = () => {
           <div className="text-center text-white">
             <div className="w-20 h-20 rounded-sm mx-auto mb-6 flex items-center justify-center overflow-hidden">
               <img 
-                src="https://customer-assets.emergentagent.com/job_quincaillerie-pro-6/artifacts/fudv1hmp_inter.jpg" 
-                alt="INTERTRADE TOUBA" 
+                src="/logo.jpg" 
+                alt="Wakeur Khadim Rassoul SECK et FRERES" 
                 className="w-full h-full object-cover"
               />
             </div>
-            <h1 className="text-4xl font-bold font-[Chivo] tracking-tight mb-4">
-              INTERTRADE TOUBA
+            <h1 className="text-3xl font-bold font-[Chivo] tracking-tight mb-4">
+              Wakeur Khadim Rassoul<br />SECK et FRERES
             </h1>
             <p className="text-slate-300 max-w-md">
               Solution complète de gestion pour vos produits alimentaires. 
@@ -71,8 +71,8 @@ const LoginPage = () => {
               <Leaf className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h1 className="font-bold text-xl font-[Chivo] tracking-tight text-slate-900">
-                INTERTRADE TOUBA
+              <h1 className="font-bold text-lg font-[Chivo] tracking-tight text-slate-900 leading-tight">
+                Wakeur Khadim Rassoul SECK et FRERES
               </h1>
             </div>
           </div>

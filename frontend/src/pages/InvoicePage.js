@@ -89,12 +89,12 @@ const InvoicePage = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img 
-              src="https://customer-assets.emergentagent.com/job_quincaillerie-pro-6/artifacts/fudv1hmp_inter.jpg" 
-              alt="INTERTRADE TOUBA" 
+              src="/logo.jpg" 
+              alt="Wakeur Khadim Rassoul SECK et FRERES" 
               className="w-10 h-10 rounded-sm object-cover"
             />
             <div>
-              <h1 className="text-lg font-bold font-[Chivo] text-slate-900">INTERTRADE TOUBA</h1>
+              <h1 className="text-lg font-bold font-[Chivo] text-slate-900">Wakeur Khadim Rassoul SECK et FRERES</h1>
               <p className="text-xs text-slate-500">Vos produits alimentaires de qualité</p>
             </div>
           </div>
@@ -188,7 +188,7 @@ const InvoicePage = () => {
       {/* Footer */}
       <div className="mt-4 pt-3 border-t border-slate-200 text-center text-xs text-slate-500">
         <p>Merci pour votre achat!</p>
-        <p className="mt-1">INTERTRADE TOUBA</p>
+        <p className="mt-1">Wakeur Khadim Rassoul SECK et FRERES</p>
         <p className="mt-1 text-[10px]">Développé par Amdy SECK - 77 571 93 98</p>
       </div>
     </div>
@@ -233,12 +233,12 @@ const InvoicePage = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <img 
-                  src="https://customer-assets.emergentagent.com/job_quincaillerie-pro-6/artifacts/fudv1hmp_inter.jpg" 
-                  alt="INTERTRADE TOUBA" 
+                  src="/logo.jpg" 
+                  alt="Wakeur Khadim Rassoul SECK et FRERES" 
                   className="w-14 h-14 rounded-sm object-cover"
                 />
                 <div>
-                  <h1 className="text-xl font-bold font-[Chivo] text-slate-900">INTERTRADE TOUBA</h1>
+                  <h1 className="text-xl font-bold font-[Chivo] text-slate-900">Wakeur Khadim Rassoul SECK et FRERES</h1>
                   <p className="text-sm text-slate-500">Vos produits alimentaires de qualité</p>
                 </div>
               </div>
@@ -334,7 +334,7 @@ const InvoicePage = () => {
           {/* Footer */}
           <div className="mt-8 pt-6 border-t border-slate-200 text-center text-sm text-slate-500">
             <p>Merci pour votre achat!</p>
-            <p className="mt-1">INTERTRADE TOUBA - Vos produits alimentaires de qualité</p>
+            <p className="mt-1">Wakeur Khadim Rassoul SECK et FRERES - Vos produits alimentaires de qualité</p>
             <p className="mt-2 text-xs">Développé par Amdy SECK - 77 571 93 98</p>
           </div>
         </div>

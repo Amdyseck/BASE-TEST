@@ -1,4 +1,4 @@
-# INTERTRADE TOUBA - Logiciel de Gestion de Produits Alimentaires
+# Wakeur Khadim Rassoul SECK et FRERES - Logiciel de Gestion de Produits Alimentaires
 
 ## Problème Initial
 Créer un logiciel de gestion de produits alimentaires complet avec:
@@ -74,6 +74,6 @@ Créer un logiciel de gestion de produits alimentaires complet avec:
 7. **Tableau de bord avancé** - Graphiques et tendances
 
 ## Identifiants de Test
-- Email: admin@intertrade.sn
+- Email: admin@wakeur.sn
 - Mot de passe: admin123
 - Rôle: Administrateur

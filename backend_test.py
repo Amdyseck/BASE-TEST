@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 
 class QuincaillerieAPITester:
-    def __init__(self, base_url="https://intertrade-manager.preview.emergentagent.com/api"):
+    def __init__(self, base_url="https://food-commerce-hub-3.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.token = None
         self.user = None
@@ -70,7 +70,7 @@ class QuincaillerieAPITester:
             "POST",
             "auth/login",
             200,
-            data={"email": "admin@intertrade.sn", "password": "admin123"}
+            data={"email": "admin@wakeur.sn", "password": "admin123"}
         )
         if success and 'access_token' in response:
             self.token = response['access_token']
@@ -805,7 +805,7 @@ class QuincaillerieAPITester:
             )
 
 def main():
-    print("🚀 Starting INTERTRADE TOUBA API Tests - Purchase & Supplier Invoice Features")
+    print("🚀 Starting Wakeur Khadim Rassoul SECK et FRERES API Tests - Purchase & Supplier Invoice Features")
     print("=" * 70)
     
     tester = QuincaillerieAPITester()

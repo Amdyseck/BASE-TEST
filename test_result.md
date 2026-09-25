@@ -1,4 +1,4 @@
-# Test Results - INTERTRADE TOUBA Purchase & Supplier Invoice Features
+# Test Results - Wakeur Khadim Rassoul SECK et FRERES Purchase & Supplier Invoice Features
 
 ## Testing Scope
 Testing the new features for purchases and supplier invoices:
@@ -9,9 +9,9 @@ Testing the new features for purchases and supplier invoices:
 5. Check balance tracking for both customers and suppliers
 
 ## Test Credentials
-- Email: admin@intertrade.sn
+- Email: admin@wakeur.sn
 - Password: admin123
-- API Base: https://intertrade-manager.preview.emergentagent.com/api
+- API Base: https://food-commerce-hub-3.preview.emergentagent.com/api
 
 backend:
   - task: "Login Authentication"
@@ -27,7 +27,7 @@ backend:
         comment: "Initial test setup - needs authentication verification"
       - working: true
         agent: "testing"
-        comment: "✅ Authentication successful with admin@intertrade.sn credentials. User logged in as Admin INTERTRADE with admin role."
+        comment: "✅ Authentication successful with admin@wakeur.sn credentials. User logged in as Administrateur with admin role."
 
   - task: "Create Purchase Order with Depot"
     implemented: true
@@ -136,6 +136,6 @@ test_plan:
 
 agent_communication:
   - agent: "testing"
-    message: "Starting comprehensive testing of purchase and supplier invoice features for INTERTRADE TOUBA"
+    message: "Starting comprehensive testing of purchase and supplier invoice features for Wakeur Khadim Rassoul SECK et FRERES"
   - agent: "testing"
     message: "✅ ALL TESTS PASSED (39/39) - 100% Success Rate. Complete purchase and supplier invoice workflow tested successfully including: depot management, purchase orders with depot selection, order reception with stock updates, supplier invoice creation with FF- prefix, payment processing with bank journal entries, and comprehensive balance tracking for both customers and suppliers."

@@ -3,8 +3,8 @@ import sys
 import json
 from datetime import datetime
 
-class IntertradeAPITester:
-    def __init__(self, base_url="https://intertrade-manager.preview.emergentagent.com/api"):
+class WakeurAPITester:
+    def __init__(self, base_url="https://food-commerce-hub-3.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.token = None
         self.user = None
@@ -44,7 +44,7 @@ class IntertradeAPITester:
                 print(f"✅ Passed - Status: {response.status_code}")
                 try:
                     return True, response.json() if response.content else {}
-                except:
+                except Exception:
                     return True, {}
             else:
                 print(f"❌ Failed - Expected {expected_status}, got {response.status_code}")
@@ -72,7 +72,7 @@ class IntertradeAPITester:
             "POST",
             "auth/login",
             200,
-            data={"email": "admin@intertrade.sn", "password": "admin123"}
+            data={"email": "admin@wakeur.sn", "password": "admin123"}
         )
         if success and 'access_token' in response:
             self.token = response['access_token']
@@ -475,10 +475,10 @@ class IntertradeAPITester:
             )
 
 def main():
-    print("🚀 Starting INTERTRADE TOUBA New Features API Tests")
+    print("🚀 Starting Wakeur Khadim Rassoul SECK et FRERES New Features API Tests")
     print("=" * 60)
     
-    tester = IntertradeAPITester()
+    tester = WakeurAPITester()
     
     # Test authentication first
     if not tester.test_admin_login():
