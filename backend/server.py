@@ -1638,7 +1638,9 @@ async def root():
 # Include router
 def _include_extra_routes():
     from extra_routes import router as extra_router
+    from export_routes import router as export_router
     api_router.include_router(extra_router)
+    api_router.include_router(export_router)
 
 _include_extra_routes()
 app.include_router(api_router)

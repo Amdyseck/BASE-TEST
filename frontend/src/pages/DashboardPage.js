@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import api from "../lib/api";
+import { OverdueReminders } from "../components/OverdueReminders";
+import { useSettings } from "../contexts/SettingsContext";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import {
@@ -15,6 +17,7 @@ import {
 import { toast } from "sonner";
 
 const DashboardPage = () => {
+  const { settings } = useSettings();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -143,6 +146,8 @@ const DashboardPage = () => {
           </CardContent>
         </Card>
       </div>
+
+      <OverdueReminders companyName={settings.name} />
 
       {/* Secondary stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

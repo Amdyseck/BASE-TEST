@@ -1,15 +1,18 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useSettings } from "../contexts/SettingsContext";
+import { useAuth } from "../contexts/AuthContext";
 import { PaymentBadge } from "../lib/paymentMethods";
 import api from "../lib/api";
 import { Button } from "../components/ui/button";
 import { toast } from "sonner";
-import { ArrowLeft, Receipt, FileText, PlusCircle } from "lucide-react";
+import { X, Receipt, FileText, PlusCircle } from "lucide-react";
 
 const InvoicePage = () => {
   const { saleId } = useParams();
   const { settings, logoUrl } = useSettings();
+  const { hasModule } = useAuth();
+  const navigate = useNavigate();
   const [sale, setSale] = useState(null);
   const [loading, setLoading] = useState(true);
   const [printMode, setPrintMode] = useState("ticket"); // ticket or a4
@@ -86,7 +89,7 @@ const InvoicePage = () => {
       <div className="flex flex-col items-center justify-center h-screen">
         <p className="text-slate-500 mb-4">Facture non trouvée</p>
         <Link to="/sales">
-          <Button variant="outline">Retour aux ventes</Button>
+          <Button variant="outline">Fermer</Button>
         </Link>
       </div>
     );
@@ -197,12 +200,10 @@ const InvoicePage = () => {
     <div className="min-h-screen bg-slate-100 p-4 lg:p-8" data-testid="invoice-page">
       {/* Actions bar */}
       <div className="max-w-4xl mx-auto mb-4 flex items-center justify-between no-print">
-        <Link to="/sales">
-          <Button variant="outline" className="rounded-sm">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Retour
-          </Button>
-        </Link>
+        <Button variant="outline" className="rounded-sm" onClick={() => navigate(hasModule("pos") ? "/pos" : "/sales")} data-testid="invoice-close-btn">
+          <X className="w-4 h-4 mr-2" />
+          Fermer
+        </Button>
         <div className="flex gap-2">
           <Link to="/pos">
             <Button variant="outline" className="rounded-sm" data-testid="new-invoice-btn">

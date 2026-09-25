@@ -168,3 +168,16 @@ body > div[style*="fixed"][style*="bottom"][style*="right"]:not(#root):not(.main
 body > a[style*="fixed"][style*="bottom"][style*="right"] {
     display: none !important;
 }
+
+@media print {
+    .sidebar, .mobile-menu-btn, [data-testid="mobile-menu-btn"] {
+        display: none !important;
+    }
+    .main-content {
+        margin-left: 0 !important;
+    }
+    .grid-pattern {
+        background: white !important;
+        padding: 0 !important;
+    }
+}

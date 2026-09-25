@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import api from "../lib/api";
+import { downloadFile } from "../lib/download";
 import { useSettings } from "../contexts/SettingsContext";
 import { PaymentBadge } from "../lib/paymentMethods";
 import { Button } from "../components/ui/button";
 import { toast } from "sonner";
-import { Printer, ArrowLeft } from "lucide-react";
+import { Printer, ArrowLeft, FileSpreadsheet } from "lucide-react";
 
 const formatCurrency = (amount) =>
   new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", minimumFractionDigits: 0 }).format(amount || 0);
@@ -60,9 +61,14 @@ const StatementPage = () => {
         <Link to="/accounts">
           <Button variant="outline" className="rounded-sm"><ArrowLeft className="w-4 h-4 mr-2" /> Retour</Button>
         </Link>
-        <Button onClick={() => window.print()} className="btn-primary" data-testid="print-statement-btn">
-          <Printer className="w-4 h-4 mr-2" /> Imprimer
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" className="rounded-sm" onClick={() => downloadFile(`/export/accounts/${type}/${id}/statement.xlsx`, "releve.xlsx").catch(() => toast.error("Erreur lors de l'export"))} data-testid="export-statement-excel-btn">
+            <FileSpreadsheet className="w-4 h-4 mr-2" /> Excel
+          </Button>
+          <Button onClick={() => window.print()} className="btn-primary" data-testid="print-statement-btn">
+            <Printer className="w-4 h-4 mr-2" /> PDF / Imprimer
+          </Button>
+        </div>
       </div>
 
       <div className="max-w-4xl mx-auto bg-white shadow-lg rounded-sm p-8 statement-sheet">

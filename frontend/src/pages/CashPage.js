@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { downloadFile } from "../lib/download";
 import api from "../lib/api";
 import { useConfirm } from "../contexts/ConfirmContext";
 import { useAuth } from "../contexts/AuthContext";
@@ -11,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { toast } from "sonner";
-import { Banknote, Lock, Unlock, Plus, Trash2, ArrowUpCircle, ArrowDownCircle, History, Coins } from "lucide-react";
+import { Banknote, Lock, Unlock, Plus, Trash2, ArrowUpCircle, ArrowDownCircle, History, Coins, Receipt, FileSpreadsheet, Printer } from "lucide-react";
 
 const CATEGORIES = [
   { value: "depense", label: "Dépense", type: "out" },
@@ -31,6 +33,7 @@ const formatDate = (dateStr) =>
 const CashPage = () => {
   const confirm = useConfirm();
   const { can } = useAuth();
+  const navigate = useNavigate();
   const canDelete = can("can_delete");
   const [session, setSession] = useState(null);
   const [summary, setSummary] = useState(null);
@@ -91,7 +94,7 @@ const CashPage = () => {
       setCloseDialog(false);
       setClosingAmount("");
       setClosingNotes("");
-      fetchAll();
+      navigate(`/cash/ticket/${res.data.id}`);
     } catch (error) {
       toast.error(error.response?.data?.detail || "Erreur lors de la clôture");
     }
@@ -118,6 +121,14 @@ const CashPage = () => {
       fetchAll();
     } catch (error) {
       toast.error(error.response?.data?.detail || "Erreur lors de la suppression");
+    }
+  };
+
+  const handleExport = async () => {
+    try {
+      await downloadFile(session ? `/export/cash/movements.xlsx?session_id=${session.id}` : "/export/cash/movements.xlsx", "journal_caisse.xlsx");
+    } catch (error) {
+      toast.error("Erreur lors de l'export");
     }
   };
 
@@ -206,6 +217,13 @@ const CashPage = () => {
         </TabsList>
 
         <TabsContent value="movements" className="mt-4 space-y-4">
+          <div className="flex justify-end gap-2 no-print">
+            <Button variant="outline" size="sm" className="rounded-sm" onClick={handleExport} data-testid="export-cash-excel-btn"><FileSpreadsheet className="w-4 h-4 mr-2" /> Excel</Button>
+            <Button variant="outline" size="sm" className="rounded-sm" onClick={() => window.print()} data-testid="print-cash-btn"><Printer className="w-4 h-4 mr-2" /> PDF / Imprimer</Button>
+            {session && (
+              <Link to={`/cash/ticket/${session.id}`}><Button variant="outline" size="sm" className="rounded-sm" data-testid="current-ticket-btn"><Receipt className="w-4 h-4 mr-2" /> Ticket</Button></Link>
+            )}
+          </div>
           <div className="grid grid-cols-3 gap-4">
             <Card className="stat-card"><CardContent className="pt-4"><p className="stat-card-label">Entrées</p><p className="stat-card-value text-green-700">{formatCurrency(movSummary.total_in)}</p></CardContent></Card>
             <Card className="stat-card"><CardContent className="pt-4"><p className="stat-card-label">Sorties</p><p className="stat-card-value text-red-600">{formatCurrency(movSummary.total_out)}</p></CardContent></Card>
@@ -273,6 +291,7 @@ const CashPage = () => {
                   <TableHead className="text-right">Compté</TableHead>
                   <TableHead className="text-right">Écart</TableHead>
                   <TableHead>Statut</TableHead>
+                  <TableHead className="text-right">Ticket</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -291,9 +310,12 @@ const CashPage = () => {
                         {s.status === "open" ? "Ouverte" : "Clôturée"}
                       </span>
                     </TableCell>
+                    <TableCell className="text-right">
+                      <Link to={`/cash/ticket/${s.id}`}><Button variant="ghost" size="sm" data-testid={`ticket-btn-${s.id}`}><Receipt className="w-4 h-4" /></Button></Link>
+                    </TableCell>
                   </TableRow>
                 )) : (
-                  <TableRow><TableCell colSpan={7} className="text-center py-12 text-slate-400">Aucune session</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={8} className="text-center py-12 text-slate-400">Aucune session</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>

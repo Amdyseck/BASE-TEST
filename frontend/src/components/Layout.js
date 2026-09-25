@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useSettings } from "../contexts/SettingsContext";
+import { ChangePasswordDialog } from "./ChangePasswordDialog";
 import {
   LayoutDashboard,
   Package,
@@ -22,6 +23,7 @@ import {
   Banknote,
   UserCog,
   History,
+  KeyRound,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import {
@@ -37,6 +39,7 @@ const Layout = () => {
   const { settings, logoUrl } = useSettings();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [pwdOpen, setPwdOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -130,6 +133,10 @@ const Layout = () => {
                 <span className="text-sm text-slate-500">{user?.email}</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setPwdOpen(true)} data-testid="change-password-menu">
+                <KeyRound className="mr-2 h-4 w-4" />
+                Changer mon mot de passe
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={handleLogout} className="text-red-600" data-testid="logout-btn">
                 <LogOut className="mr-2 h-4 w-4" />
                 Déconnexion
@@ -138,6 +145,8 @@ const Layout = () => {
           </DropdownMenu>
         </div>
       </aside>
+
+      <ChangePasswordDialog open={pwdOpen} onOpenChange={setPwdOpen} />
 
       {/* Main content */}
       <main className="main-content">

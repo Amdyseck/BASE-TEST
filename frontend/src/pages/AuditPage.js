@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import api from "../lib/api";
+import { downloadFile } from "../lib/download";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -8,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { toast } from "sonner";
-import { History, Filter, Eye } from "lucide-react";
+import { History, Filter, Eye, FileSpreadsheet, Printer } from "lucide-react";
 
 export const MODULE_LABELS = {
   pos: "Facturation", sales: "Ventes", products: "Produits", categories: "Familles", purchases: "Achats",
@@ -60,12 +61,24 @@ const AuditPage = () => {
     fetchLogs();
   }, []);
 
+  const buildParams = () => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([k, v]) => { if (v && v !== "all") params.append(k, v); });
+    return params.toString();
+  };
+
+  const handleExport = async () => {
+    try {
+      await downloadFile(`/export/audit-logs.xlsx?${buildParams()}`, "historique.xlsx");
+    } catch (error) {
+      toast.error("Erreur lors de l'export");
+    }
+  };
+
   const fetchLogs = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      Object.entries(filters).forEach(([k, v]) => { if (v && v !== "all") params.append(k, v); });
-      const response = await api.get(`/audit-logs?${params.toString()}`);
+      const response = await api.get(`/audit-logs?${buildParams()}`);
       setLogs(response.data);
     } catch (error) {
       toast.error("Erreur lors du chargement de l'historique");
@@ -76,12 +89,18 @@ const AuditPage = () => {
 
   return (
     <div className="space-y-6" data-testid="audit-page">
-      <div>
-        <h1 className="text-2xl font-bold font-[Chivo] tracking-tight text-slate-900">Historique</h1>
-        <p className="text-slate-500 mt-1">Journal des modifications, suppressions et annulations</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold font-[Chivo] tracking-tight text-slate-900">Historique</h1>
+          <p className="text-slate-500 mt-1">Journal des modifications, suppressions et annulations</p>
+        </div>
+        <div className="flex gap-2 no-print">
+          <Button variant="outline" className="rounded-sm" onClick={handleExport} data-testid="export-audit-excel-btn"><FileSpreadsheet className="w-4 h-4 mr-2" /> Excel</Button>
+          <Button variant="outline" className="rounded-sm" onClick={() => window.print()} data-testid="print-audit-btn"><Printer className="w-4 h-4 mr-2" /> PDF / Imprimer</Button>
+        </div>
       </div>
 
-      <Card className="p-4">
+      <Card className="p-4 no-print">
         <div className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
           <div className="space-y-1">
             <Label className="overline">Utilisateur</Label>
