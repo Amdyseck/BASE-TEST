@@ -1,0 +1,53 @@
+{
+  "summary": "Iteration 4: change-password, cash session detail + ticket, dashboard overdue reminders, Excel exports (audit/statement/cash), invoice-close-btn. Backend 21/21 pytest passed. Frontend admin+caissier flows verified end-to-end with real downloads captured via page.expect_download().",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "ChangePasswordDialog & several modals", "issues": ["Radix DialogContent aria-describedby warning (a11y minor)"]}
+    ]
+  },
+  "passed_tests": [
+    "PUT /api/auth/change-password: wrong current -> 400; correct -> 200; login with new works; restored original test1234",
+    "GET /api/audit-logs?module=users&action=update contains recent 'update' entries incl. self password change",
+    "Cash flow: close pre-existing session -> open (10000) -> movement out 2000 depense -> admin sale espèces auto 'in' -> close closing=expected (diff=0) -> GET /api/cash/sessions/{id} returns session+movements+summary with correct total_in/total_out/expected/by_category",
+    "GET /api/cash/sessions/does-not-exist -> 404; caissier allowed (module cash) -> 200",
+    "GET /api/dashboard/overdue?days=0 includes newly created credit sale (customer_name/phone/overdue_amount/days_late/invoices[]); total_overdue == sum; days=7 excludes recent",
+    "GET /api/export/audit-logs.xlsx (admin) -> 200 xlsx, row 5 headers exactly ['Date','Utilisateur','Rôle','Action','Module','Élément','Modifications']; module filter OK; caissier -> 403",
+    "GET /api/export/accounts/customer/{id}/statement.xlsx -> 200 xlsx; last row column B == 'TOTAUX'",
+    "GET /api/export/cash/movements.xlsx (admin, current or with session_id) -> 200 xlsx; vendeur -> 403",
+    "FRONTEND admin: user-menu-btn -> change-password-menu opens change-password-form; wrong current -> error toast 'Mot de passe actuel incorrect' (admin password NOT changed)",
+    "FRONTEND admin /dashboard: overdue-widget rendered (currently overdue-empty since credit test sale was cleaned up)",
+    "FRONTEND admin /cash: open-session-btn -> opening-amount-input(10000) -> open-session-submit ; export-cash-excel-btn triggers .xlsx download (journal_de_caisse_*.xlsx); print-cash-btn present; current-ticket-btn -> /cash/ticket/:id (cash-ticket-page with ticket-opening, ticket-total-in, ticket-total-out, ticket-expected, print-ticket-btn, ticket-close-btn); close-session-btn -> closing-amount-input -> close-session-submit navigates to ticket with ticket-counted and ticket-difference; tab-history shows ticket-btn-{id}",
+    "FRONTEND admin /audit: export-audit-excel-btn downloads xlsx; print-audit-btn present",
+    "FRONTEND admin /accounts -> statement page -> export-statement-excel-btn downloads xlsx",
+    "FRONTEND admin /invoice/:id: invoice-close-btn 'Fermer' navigates to /pos",
+    "FRONTEND caissier login OK, sidebar = [nav-dashboard, nav-cash, nav-sales, nav-customers, nav-suppliers, nav-accounts, nav-bank-journal] — NO nav-pos, no nav-users/nav-settings; /cash accessible; /cash/ticket/:id accessible"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_iter4_features.py",
+    "/app/test_reports/pytest/iter4.xml"
+  ],
+  "action_items": [
+    "OPTIONAL a11y: add DialogDescription to ChangePasswordDialog and other DialogContent to silence Radix aria-describedby warnings.",
+    "OPTIONAL: In export_routes.py audit end_date lexicographic condition adds 'T23:59:59.999999' only if len==10; consider generalizing.",
+    "OPTIONAL code split: server.py is large; export_routes.py imports from server (audit, users). Fine but consider splitting further."
+  ],
+  "critical_code_review_comments": [
+    "OverdueReminders.buildMessage assumes c.days_late exists; backend now returns it. OK.",
+    "download.js correctly uses blob + <a download> chain; xlsx filename picked from content-disposition. OK.",
+    "cash/sessions/{id} summary.expected prefers stored session.expected_amount (post-close) over recomputed. Good — avoids drift after close.",
+    "change-password endpoint uses verify_password + hash_password from server; min length 6 enforced. bcrypt via passlib (assumed). OK.",
+    "dashboard/overdue currently open to any authenticated user (get_current_user). Consider gating on 'dashboard' or 'customers' module if needed; but any auth user seeing dashboard is expected."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter4_features.py"
+  ],
+  "success_rate": {"backend": "100% (21/21 pytest)", "frontend": "100% (all iter4 flows verified across admin + caissier)"},
+  "test_credentials": "admin@wakeur.sn/admin123, gerant.test@wakeur.sn/test1234, vendeur.test@wakeur.sn/test1234, caissier.test@wakeur.sn/test1234 — vendeur test1234 restored after change-password test; admin password NOT changed.",
+  "seed_data_creation": "Re-created test users gerant.test / vendeur.test / caissier.test via /api/auth/register (they had been removed since iteration 3). Temporary TEST_Overdue customer + credit sale created then cancelled + deleted. Cash session opened/closed for tests (final state: last session closed with diff=0).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend regression file: /app/backend/tests/test_iter4_features.py (21 tests). Complements test_new_features_v2.py and test_roles_audit.py. Test users are recreated; don't delete them. downloadFile flow uses axios blob + <a download>; use page.expect_download() with timeout>=15s for cash export (audit is faster). Caissier can view /cash and /cash/ticket/:id; caissier sidebar does NOT contain nav-pos."
+}

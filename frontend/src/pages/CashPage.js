@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { downloadFile } from "../lib/download";
+import { UnpaidInvoices } from "../components/UnpaidInvoices";
 import api from "../lib/api";
 import { useConfirm } from "../contexts/ConfirmContext";
 import { useAuth } from "../contexts/AuthContext";
@@ -13,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { toast } from "sonner";
-import { Banknote, Lock, Unlock, Plus, Trash2, ArrowUpCircle, ArrowDownCircle, History, Coins, Receipt, FileSpreadsheet, Printer } from "lucide-react";
+import { Banknote, Lock, Unlock, Plus, Trash2, ArrowUpCircle, ArrowDownCircle, History, Coins, Receipt, FileSpreadsheet, Printer, FileText } from "lucide-react";
 
 const CATEGORIES = [
   { value: "depense", label: "Dépense", type: "out" },
@@ -206,8 +207,11 @@ const CashPage = () => {
         </Card>
       )}
 
-      <Tabs defaultValue="movements">
+      <Tabs defaultValue="unpaid">
         <TabsList className="bg-white border border-slate-200 rounded-sm p-1">
+          <TabsTrigger value="unpaid" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white" data-testid="tab-unpaid">
+            <FileText className="w-4 h-4 mr-2" /> Factures à régler
+          </TabsTrigger>
           <TabsTrigger value="movements" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white" data-testid="tab-movements">
             <Coins className="w-4 h-4 mr-2" /> Journal de caisse
           </TabsTrigger>
@@ -215,6 +219,10 @@ const CashPage = () => {
             <History className="w-4 h-4 mr-2" /> Historique des sessions
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="unpaid" className="mt-4">
+          <UnpaidInvoices onPaid={fetchAll} />
+        </TabsContent>
 
         <TabsContent value="movements" className="mt-4 space-y-4">
           <div className="flex justify-end gap-2 no-print">

@@ -23,6 +23,9 @@ Contrainte : ne pas traduire WAVE, Orange Money, etc. Langue : français.
 - 2026-06 : Journal d'audit « Historique » (`/audit`, admin/gérant) : créations/modifications/suppressions/annulations avec avant/après, filtres utilisateur/module/action/période.
 - 2026-06 : Écran Facturation en 3 colonnes (règlement | facture avec lignes qté/PU modifiables | liste d'articles une par ligne avec recherche et code-barres).
 
+- 2026-06 : Changement de mot de passe par l'utilisateur (menu profil) ; ticket de clôture de caisse imprimable (80mm) après clôture + historique ; rappels impayés sur tableau de bord (≥7 j) avec boutons WhatsApp/SMS pré-remplis ; exports Excel (historique, relevés, journal de caisse) + PDF/Imprimer ; bouton « Fermer » sur la facture.
+- 2026-06 : Onglet « Factures à régler » dans Gestion de caisse : factures clients à encaisser + factures fournisseurs à régler, encaissement/règlement direct (alimente caisse/banque).
+
 ## Backlog
 - P2 : découper `server.py` en routers modulaires
 - P2 : tests frontend automatisés
