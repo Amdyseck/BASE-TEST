@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import api from "../lib/api";
+import { paymentButtonClass } from "../lib/paymentMethods";
+import { useConfirm } from "../contexts/ConfirmContext";
 import { useAuth } from "../contexts/AuthContext";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -37,6 +39,7 @@ import { toast } from "sonner";
 import { Search, Receipt, FileText, CreditCard, XCircle, RotateCcw, Banknote, Smartphone } from "lucide-react";
 
 const SalesPage = () => {
+  const confirm = useConfirm();
   const { isAdmin } = useAuth();
   const [sales, setSales] = useState([]);
   const [unpaidSales, setUnpaidSales] = useState([]);
@@ -110,7 +113,7 @@ const SalesPage = () => {
   };
 
   const handleCancel = async (sale) => {
-    if (!window.confirm(`Êtes-vous sûr de vouloir annuler la facture ${sale.invoice_number} ? Le stock sera restauré.`)) return;
+    if (!(await confirm({ description: `Êtes-vous sûr de vouloir annuler la facture ${sale.invoice_number} ? Le stock sera restauré.` }))) return;
     
     try {
       await api.post(`/sales/${sale.id}/cancel`);
@@ -134,17 +137,6 @@ const SalesPage = () => {
     return <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">Non payée</span>;
   };
 
-  const getPaymentMethodLabel = (method) => {
-    const methods = {
-      especes: "Espèces",
-      wave: "Wave",
-      orange_money: "Orange Money",
-      cheque: "Chèque",
-      banque: "Banque",
-    };
-    return methods[method] || method;
-  };
-
   const filteredSales = (activeTab === "unpaid" ? unpaidSales : sales).filter(
     (s) =>
       s.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -153,7 +145,7 @@ const SalesPage = () => {
 
   const paymentMethods = [
     { value: "especes", label: "Espèces", icon: Banknote },
-    { value: "wave", label: "Wave", icon: Smartphone },
+    { value: "wave", label: "WAVE", icon: Smartphone },
     { value: "orange_money", label: "Orange Money", icon: Smartphone },
     { value: "cheque", label: "Chèque", icon: CreditCard },
     { value: "banque", label: "Banque", icon: CreditCard },
@@ -441,7 +433,7 @@ const SalesPage = () => {
                     type="button"
                     variant={paymentMethod === method.value ? "default" : "outline"}
                     onClick={() => setPaymentMethod(method.value)}
-                    className={`rounded-sm text-xs ${paymentMethod === method.value ? "bg-slate-900" : ""}`}
+                    className={`rounded-sm text-xs ${paymentMethod === method.value ? paymentButtonClass(method.value) : ""}`}
                   >
                     <method.icon className="w-3 h-3 mr-1" />
                     {method.label}

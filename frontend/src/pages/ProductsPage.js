@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import api from "../lib/api";
+import { useConfirm } from "../contexts/ConfirmContext";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -31,6 +32,7 @@ import { toast } from "sonner";
 import { Plus, Search, Edit, Trash2, Package, Barcode, Warehouse } from "lucide-react";
 
 const ProductsPage = () => {
+  const confirm = useConfirm();
   const { isAdmin, isVendeur } = useAuth();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -135,7 +137,7 @@ const ProductsPage = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Êtes-vous sûr de vouloir supprimer ce produit ?")) return;
+    if (!(await confirm({ description: "Êtes-vous sûr de vouloir supprimer ce produit ?" }))) return;
     try {
       await api.delete(`/products/${id}`);
       toast.success("Produit supprimé");

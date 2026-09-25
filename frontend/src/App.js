@@ -15,6 +15,12 @@ import UsersPage from "./pages/UsersPage";
 import DepotsPage from "./pages/DepotsPage";
 import InvoicePage from "./pages/InvoicePage";
 import BankJournalPage from "./pages/BankJournalPage";
+import AccountsPage from "./pages/AccountsPage";
+import StatementPage from "./pages/StatementPage";
+import CashPage from "./pages/CashPage";
+import SettingsPage from "./pages/SettingsPage";
+import { SettingsProvider } from "./contexts/SettingsContext";
+import { ConfirmProvider } from "./contexts/ConfirmContext";
 import Layout from "./components/Layout";
 import "./App.css";
 
@@ -43,12 +49,19 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 function App() {
   return (
     <AuthProvider>
+      <SettingsProvider>
+      <ConfirmProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/invoice/:saleId" element={
             <ProtectedRoute>
               <InvoicePage />
+            </ProtectedRoute>
+          } />
+          <Route path="/accounts/:type/:id" element={
+            <ProtectedRoute>
+              <StatementPage />
             </ProtectedRoute>
           } />
           <Route path="/" element={
@@ -67,16 +80,25 @@ function App() {
             <Route path="orders" element={<OrdersPage />} />
             <Route path="depots" element={<DepotsPage />} />
             <Route path="bank-journal" element={<BankJournalPage />} />
+            <Route path="accounts" element={<AccountsPage />} />
+            <Route path="cash" element={<CashPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="users" element={
               <ProtectedRoute allowedRoles={["admin"]}>
                 <UsersPage />
               </ProtectedRoute>
             } />
+            <Route path="settings" element={
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <SettingsPage />
+              </ProtectedRoute>
+            } />
           </Route>
         </Routes>
         <Toaster position="top-right" richColors />
       </BrowserRouter>
+      </ConfirmProvider>
+      </SettingsProvider>
     </AuthProvider>
   );
 }

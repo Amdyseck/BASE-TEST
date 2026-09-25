@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { useSettings } from "../contexts/SettingsContext";
 import {
   LayoutDashboard,
   Package,
@@ -17,7 +18,9 @@ import {
   X,
   Warehouse,
   Landmark,
-  Leaf,
+  Wallet,
+  Banknote,
+  UserCog,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import {
@@ -30,6 +33,7 @@ import {
 
 const Layout = () => {
   const { user, logout, isAdmin } = useAuth();
+  const { settings, logoUrl } = useSettings();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -41,11 +45,13 @@ const Layout = () => {
   const navItems = [
     { to: "/dashboard", icon: LayoutDashboard, label: "Tableau de bord" },
     { to: "/pos", icon: ShoppingCart, label: "Caisse" },
+    { to: "/cash", icon: Banknote, label: "Gestion caisse" },
     { to: "/products", icon: Package, label: "Produits" },
     { to: "/categories", icon: FolderOpen, label: "Familles" },
     { to: "/sales", icon: Receipt, label: "Ventes" },
     { to: "/customers", icon: Users, label: "Clients" },
     { to: "/suppliers", icon: Truck, label: "Fournisseurs" },
+    { to: "/accounts", icon: Wallet, label: "Comptes tiers" },
     { to: "/orders", icon: ClipboardList, label: "Achats" },
     { to: "/depots", icon: Warehouse, label: "Dépôts" },
     { to: "/bank-journal", icon: Landmark, label: "Journal Banque" },
@@ -53,7 +59,8 @@ const Layout = () => {
   ];
 
   if (isAdmin) {
-    navItems.push({ to: "/users", icon: Settings, label: "Utilisateurs" });
+    navItems.push({ to: "/users", icon: UserCog, label: "Utilisateurs" });
+    navItems.push({ to: "/settings", icon: Settings, label: "Paramètres" });
   }
 
   return (
@@ -72,13 +79,14 @@ const Layout = () => {
         <div className="p-4 border-b border-slate-800">
           <div className="flex items-center gap-3">
             <img 
-              src="/logo.jpg" 
-              alt="Wakeur Khadim Rassoul SECK et FRERES" 
-              className="w-12 h-12 rounded-sm object-cover"
+              src={logoUrl} 
+              alt={settings.name} 
+              className="w-12 h-12 rounded-sm object-cover bg-white flex-shrink-0"
+              data-testid="sidebar-logo"
             />
-            <div>
-              <h1 className="font-bold text-sm font-[Chivo] tracking-tight leading-tight">Wakeur Khadim Rassoul</h1>
-              <p className="text-xs text-slate-400">SECK et FRERES</p>
+            <div className="min-w-0">
+              <h1 className="font-bold text-sm font-[Chivo] tracking-tight leading-tight" data-testid="sidebar-company-name">{settings.name}</h1>
+              {settings.slogan && <p className="text-[11px] text-slate-400 truncate">{settings.slogan}</p>}
             </div>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import api from "../lib/api";
+import { useConfirm } from "../contexts/ConfirmContext";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -24,6 +25,7 @@ import { toast } from "sonner";
 import { Plus, Search, Edit, Trash2, Truck, Phone, Mail, User } from "lucide-react";
 
 const SuppliersPage = () => {
+  const confirm = useConfirm();
   const { isAdmin, isVendeur } = useAuth();
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -84,7 +86,7 @@ const SuppliersPage = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Êtes-vous sûr de vouloir supprimer ce fournisseur ?")) return;
+    if (!(await confirm({ description: "Êtes-vous sûr de vouloir supprimer ce fournisseur ?" }))) return;
     try {
       await api.delete(`/suppliers/${id}`);
       toast.success("Fournisseur supprimé");

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import api from "../lib/api";
+import { paymentButtonClass } from "../lib/paymentMethods";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -23,8 +24,7 @@ import {
   Barcode,
   Banknote,
   Smartphone,
-  CreditCard,
-} from "lucide-react";
+  CreditCard, Lock } from "lucide-react";
 
 const POSPage = () => {
   const navigate = useNavigate();
@@ -40,6 +40,7 @@ const POSPage = () => {
   const [discount, setDiscount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [cashSession, setCashSession] = useState(undefined);
 
   useEffect(() => {
     fetchData();
@@ -50,12 +51,14 @@ const POSPage = () => {
 
   const fetchData = async () => {
     try {
-      const [productsRes, customersRes] = await Promise.all([
+      const [productsRes, customersRes, cashRes] = await Promise.all([
         api.get("/products"),
         api.get("/customers"),
+        api.get("/cash/session/current"),
       ]);
       setProducts(productsRes.data);
       setCustomers(customersRes.data);
+      setCashSession(cashRes.data.session);
     } catch (error) {
       toast.error("Erreur lors du chargement des données");
     } finally {
@@ -229,7 +232,7 @@ const POSPage = () => {
 
   const paymentMethods = [
     { value: "especes", label: "Espèces", icon: Banknote },
-    { value: "wave", label: "Wave", icon: Smartphone },
+    { value: "wave", label: "WAVE", icon: Smartphone },
     { value: "orange_money", label: "Orange Money", icon: Smartphone },
     { value: "cheque", label: "Chèque", icon: CreditCard },
     { value: "banque", label: "Banque", icon: CreditCard },
@@ -252,6 +255,18 @@ const POSPage = () => {
           </h1>
           <p className="text-slate-500 mt-1">Enregistrez vos ventes</p>
         </div>
+        {cashSession === null && (
+          <Link to="/cash" className="flex items-center gap-2 px-3 py-2 bg-orange-50 border border-orange-200 text-orange-800 text-sm rounded-sm hover:bg-orange-100 transition-colors" data-testid="pos-cash-closed-banner">
+            <Lock className="w-4 h-4" />
+            Caisse non ouverte — ouvrir la caisse
+          </Link>
+        )}
+        {cashSession && (
+          <span className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 text-green-800 text-sm rounded-sm" data-testid="pos-cash-open-badge">
+            <span className="w-2 h-2 rounded-full bg-green-500" />
+            Caisse ouverte
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -430,7 +445,7 @@ const POSPage = () => {
                       key={method.value}
                       variant={paymentMethod === method.value ? "default" : "outline"}
                       onClick={() => setPaymentMethod(method.value)}
-                      className={`rounded-sm text-xs ${paymentMethod === method.value ? "bg-slate-900" : ""}`}
+                      className={`rounded-sm text-xs ${paymentMethod === method.value ? paymentButtonClass(method.value) : ""}`}
                       data-testid={`payment-${method.value}`}
                     >
                       <method.icon className="w-3 h-3 mr-1" />

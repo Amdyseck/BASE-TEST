@@ -681,46 +681,114 @@ async def delete_supplier(supplier_id: str, user: dict = Depends(require_role(["
         raise HTTPException(status_code=404, detail="Fournisseur non trouvé")
     return {"message": "Fournisseur supprimé"}
 
+# ==================== CASH / BANK HELPERS ====================
+
+async def record_cash_movement(movement_type: str, amount: float, description: str, user: dict, category: str = "vente", source_type: Optional[str] = None, source_id: Optional[str] = None, reference: str = "", is_manual: bool = False):
+    if amount <= 0:
+        return None
+    session = await db.cash_sessions.find_one({"status": "open"}, {"_id": 0, "id": 1})
+    doc = {
+        "id": str(uuid.uuid4()),
+        "session_id": session["id"] if session else None,
+        "type": movement_type,
+        "amount": round(amount, 2),
+        "description": description,
+        "category": category,
+        "source_type": source_type,
+        "source_id": source_id,
+        "reference": reference,
+        "is_manual": is_manual,
+        "created_by": user["name"],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.cash_movements.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+async def add_bank_entry(description: str, amount: float, entry_type: str, user: dict, reference: str = "", related_type: Optional[str] = None, related_id: Optional[str] = None):
+    entry = BankJournalEntry(
+        description=description,
+        amount=amount,
+        entry_type=entry_type,
+        payment_method="banque",
+        reference=reference,
+        related_entity_type=related_type,
+        related_entity_id=related_id,
+        created_by=user["name"]
+    )
+    doc = entry.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    await db.bank_journal.insert_one(doc)
+
+async def allocate_customer_payment(customer_id: str, amount: float):
+    """FIFO allocation of a customer payment to unpaid sales"""
+    allocations = []
+    remaining = amount
+    sales = await db.sales.find({"customer_id": customer_id, "balance_due": {"$gt": 0}, "status": {"$ne": "cancelled"}}, {"_id": 0}).sort("created_at", 1).to_list(1000)
+    for s in sales:
+        if remaining <= 0:
+            break
+        applied = min(remaining, s["balance_due"])
+        new_balance = round(s["balance_due"] - applied, 2)
+        await db.sales.update_one({"id": s["id"]}, {"$set": {"balance_due": new_balance, "is_paid": new_balance <= 0}, "$inc": {"amount_paid": applied}})
+        allocations.append({"id": s["id"], "reference": s["invoice_number"], "amount": round(applied, 2)})
+        remaining -= applied
+    return allocations
+
+async def allocate_supplier_payment(supplier_id: str, amount: float):
+    """FIFO allocation of a supplier payment to unpaid supplier invoices"""
+    allocations = []
+    remaining = amount
+    invoices = await db.supplier_invoices.find({"supplier_id": supplier_id, "balance_due": {"$gt": 0}}, {"_id": 0}).sort("created_at", 1).to_list(1000)
+    for inv in invoices:
+        if remaining <= 0:
+            break
+        applied = min(remaining, inv["balance_due"])
+        new_balance = round(inv["balance_due"] - applied, 2)
+        await db.supplier_invoices.update_one({"id": inv["id"]}, {"$set": {"balance_due": new_balance, "status": "paid" if new_balance <= 0 else "partial"}, "$inc": {"amount_paid": applied}})
+        allocations.append({"id": inv["id"], "reference": inv["invoice_number"], "amount": round(applied, 2)})
+        remaining -= applied
+    return allocations
+
 # ==================== PAYMENTS ROUTES ====================
 
-@api_router.post("/payments", response_model=Payment)
+@api_router.post("/payments")
 async def create_payment(payment_data: PaymentBase, user: dict = Depends(get_current_user)):
-    """Create a payment for customer or supplier"""
-    entity_name = ""
+    """Create a payment for customer (encaissement) or supplier (décaissement)"""
+    if payment_data.amount <= 0:
+        raise HTTPException(status_code=400, detail="Le montant doit être positif")
     
     if payment_data.entity_type == "customer":
         entity = await db.customers.find_one({"id": payment_data.entity_id}, {"_id": 0})
         if not entity:
             raise HTTPException(status_code=404, detail="Client non trouvé")
-        entity_name = entity["name"]
-        # Customer pays, reduce their balance
-        await db.customers.update_one(
-            {"id": payment_data.entity_id},
-            {"$inc": {"balance": -payment_data.amount}}
-        )
+        await db.customers.update_one({"id": payment_data.entity_id}, {"$inc": {"balance": -payment_data.amount}})
+        allocations = await allocate_customer_payment(payment_data.entity_id, payment_data.amount)
+        cash_type, bank_type, label = "in", "credit", "Encaissement client"
     elif payment_data.entity_type == "supplier":
         entity = await db.suppliers.find_one({"id": payment_data.entity_id}, {"_id": 0})
         if not entity:
             raise HTTPException(status_code=404, detail="Fournisseur non trouvé")
-        entity_name = entity["name"]
-        # We pay supplier, reduce our debt
-        await db.suppliers.update_one(
-            {"id": payment_data.entity_id},
-            {"$inc": {"balance": -payment_data.amount}}
-        )
+        await db.suppliers.update_one({"id": payment_data.entity_id}, {"$inc": {"balance": -payment_data.amount}})
+        allocations = await allocate_supplier_payment(payment_data.entity_id, payment_data.amount)
+        cash_type, bank_type, label = "out", "debit", "Règlement fournisseur"
     else:
         raise HTTPException(status_code=400, detail="Type d'entité invalide")
     
-    payment = Payment(
-        **payment_data.model_dump(),
-        entity_name=entity_name,
-        created_by=user["name"]
-    )
+    payment = Payment(**payment_data.model_dump(), entity_name=entity["name"], created_by=user["name"])
     doc = payment.model_dump()
     doc["created_at"] = doc["created_at"].isoformat()
+    doc["allocations"] = allocations
     await db.payments.insert_one(doc)
+    doc.pop("_id", None)
     
-    return payment
+    description = f"{label} {entity['name']}"
+    if payment_data.payment_method == "especes":
+        await record_cash_movement(cash_type, payment_data.amount, description, user, category="reglement", source_type="payment", source_id=payment.id, reference=payment_data.reference or "")
+    elif payment_data.payment_method == "banque":
+        await add_bank_entry(description, payment_data.amount, bank_type, user, reference=payment_data.reference or "", related_type=payment_data.entity_type, related_id=payment_data.entity_id)
+    
+    return doc
 
 @api_router.get("/payments")
 async def get_payments(
@@ -810,6 +878,9 @@ async def create_sale(sale_data: SaleBase, user: dict = Depends(get_current_user
     doc["items"] = [item.model_dump() for item in sale_data.items]
     await db.sales.insert_one(doc)
     
+    if sale_data.payment_method == "especes" and sale_data.amount_paid > 0:
+        await record_cash_movement("in", min(sale_data.amount_paid, total), f"Vente {invoice_number}", user, category="vente", source_type="sale", source_id=sale.id, reference=invoice_number)
+    
     # Add to bank journal if payment is by bank
     if sale_data.payment_method == "banque" and sale_data.amount_paid > 0:
         bank_entry = BankJournalEntry(
@@ -898,6 +969,9 @@ async def add_sale_payment(sale_id: str, amount: float, payment_method: str = "e
     doc = payment.model_dump()
     doc["created_at"] = doc["created_at"].isoformat()
     await db.payments.insert_one(doc)
+    
+    if payment_method == "especes":
+        await record_cash_movement("in", amount, f"Règlement facture {sale.get('invoice_number', '')}", user, category="reglement", source_type="sale", source_id=sale_id, reference=sale.get("invoice_number", ""))
     
     # Add to bank journal if payment is by bank
     if payment_method == "banque":
@@ -1287,6 +1361,9 @@ async def pay_supplier_invoice(invoice_id: str, amount: float, payment_method: s
     doc["created_at"] = doc["created_at"].isoformat()
     await db.payments.insert_one(doc)
     
+    if payment_method == "especes":
+        await record_cash_movement("out", amount, f"Règlement fournisseur {invoice['supplier_name']} - {invoice['invoice_number']}", user, category="reglement", source_type="supplier_invoice", source_id=invoice_id, reference=invoice["invoice_number"])
+    
     # Add to bank journal if payment by bank
     if payment_method == "banque":
         bank_entry = BankJournalEntry(
@@ -1435,6 +1512,11 @@ async def root():
     return {"message": "Wakeur Khadim Rassoul SECK et FRERES API v1.0"}
 
 # Include router
+def _include_extra_routes():
+    from extra_routes import router as extra_router
+    api_router.include_router(extra_router)
+
+_include_extra_routes()
 app.include_router(api_router)
 
 # CORS

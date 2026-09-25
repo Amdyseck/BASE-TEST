@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import api from "../lib/api";
+import { PaymentBadge } from "../lib/paymentMethods";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -154,17 +155,6 @@ const ReportsPage = () => {
   const handleFilter = () => {
     setLoading(true);
     fetchReports();
-  };
-
-  const getPaymentMethodLabel = (method) => {
-    const labels = {
-      especes: "Espèces",
-      wave: "Wave",
-      orange_money: "Orange Money",
-      cheque: "Chèque",
-      banque: "Banque",
-    };
-    return labels[method] || method;
   };
 
   const getDepotName = (depotId) => {
@@ -330,9 +320,7 @@ const ReportsPage = () => {
                       <TableCell>{sale.customer_name}</TableCell>
                       <TableCell className="text-slate-500">{formatDate(sale.created_at)}</TableCell>
                       <TableCell>
-                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
-                          {getPaymentMethodLabel(sale.payment_method)}
-                        </span>
+                        <PaymentBadge method={sale.payment_method} />
                       </TableCell>
                       <TableCell className="text-right font-mono font-medium">
                         {formatCurrency(sale.total)}

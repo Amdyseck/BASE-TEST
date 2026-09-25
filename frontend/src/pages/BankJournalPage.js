@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import api from "../lib/api";
+import { useConfirm } from "../contexts/ConfirmContext";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -30,6 +31,7 @@ import { toast } from "sonner";
 import { Landmark, Plus, Trash2, ArrowUpCircle, ArrowDownCircle, TrendingUp } from "lucide-react";
 
 const BankJournalPage = () => {
+  const confirm = useConfirm();
   const [entries, setEntries] = useState([]);
   const [summary, setSummary] = useState({ total_credits: 0, total_debits: 0, balance: 0 });
   const [loading, setLoading] = useState(true);
@@ -82,7 +84,7 @@ const BankJournalPage = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Êtes-vous sûr de vouloir supprimer cette écriture ?")) return;
+    if (!(await confirm({ description: "Êtes-vous sûr de vouloir supprimer cette écriture ?" }))) return;
     try {
       await api.delete(`/bank-journal/${id}`);
       toast.success("Écriture supprimée");

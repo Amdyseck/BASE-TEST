@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import api from "../lib/api";
+import { paymentButtonClass } from "../lib/paymentMethods";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -266,7 +267,7 @@ const OrdersPage = () => {
 
   const paymentMethods = [
     { value: "especes", label: "Espèces", icon: Banknote },
-    { value: "wave", label: "Wave", icon: Smartphone },
+    { value: "wave", label: "WAVE", icon: Smartphone },
     { value: "orange_money", label: "Orange Money", icon: Smartphone },
     { value: "cheque", label: "Chèque", icon: CreditCard },
     { value: "banque", label: "Banque", icon: CreditCard },
@@ -790,7 +791,7 @@ const OrdersPage = () => {
                     type="button"
                     variant={paymentMethod === method.value ? "default" : "outline"}
                     onClick={() => setPaymentMethod(method.value)}
-                    className={`rounded-sm text-xs ${paymentMethod === method.value ? "bg-slate-900" : ""}`}
+                    className={`rounded-sm text-xs ${paymentMethod === method.value ? paymentButtonClass(method.value) : ""}`}
                   >
                     <method.icon className="w-3 h-3 mr-1" />
                     {method.label}

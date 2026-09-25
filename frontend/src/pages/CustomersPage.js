@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import api from "../lib/api";
+import { useConfirm } from "../contexts/ConfirmContext";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -24,6 +25,7 @@ import { toast } from "sonner";
 import { Plus, Search, Edit, Trash2, Users, Phone, Mail } from "lucide-react";
 
 const CustomersPage = () => {
+  const confirm = useConfirm();
   const { isAdmin, isVendeur } = useAuth();
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -82,7 +84,7 @@ const CustomersPage = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Êtes-vous sûr de vouloir supprimer ce client ?")) return;
+    if (!(await confirm({ description: "Êtes-vous sûr de vouloir supprimer ce client ?" }))) return;
     try {
       await api.delete(`/customers/${id}`);
       toast.success("Client supprimé");

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import api from "../lib/api";
+import { useConfirm } from "../contexts/ConfirmContext";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -31,6 +32,7 @@ import { toast } from "sonner";
 import { Users, Shield, Trash2, Plus, Eye, EyeOff, Pencil, Key } from "lucide-react";
 
 const UsersPage = () => {
+  const confirm = useConfirm();
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -145,7 +147,7 @@ const UsersPage = () => {
   };
 
   const handleDelete = async (userId) => {
-    if (!window.confirm("Êtes-vous sûr de vouloir supprimer cet utilisateur ?")) return;
+    if (!(await confirm({ description: "Êtes-vous sûr de vouloir supprimer cet utilisateur ?" }))) return;
     try {
       await api.delete(`/users/${userId}`);
       toast.success("Utilisateur supprimé");

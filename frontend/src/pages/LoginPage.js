@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { useSettings } from "../contexts/SettingsContext";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { toast } from "sonner";
-import { Leaf, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 
 const LoginPage = () => {
   const [loading, setLoading] = useState(false);
@@ -16,6 +17,7 @@ const LoginPage = () => {
   });
 
   const { login } = useAuth();
+  const { settings, logoUrl } = useSettings();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -46,13 +48,14 @@ const LoginPage = () => {
           <div className="text-center text-white">
             <div className="w-20 h-20 rounded-sm mx-auto mb-6 flex items-center justify-center overflow-hidden">
               <img 
-                src="/logo.jpg" 
-                alt="Wakeur Khadim Rassoul SECK et FRERES" 
+                src={logoUrl} 
+                alt={settings.name} 
                 className="w-full h-full object-cover"
+                data-testid="login-logo"
               />
             </div>
-            <h1 className="text-3xl font-bold font-[Chivo] tracking-tight mb-4">
-              Wakeur Khadim Rassoul<br />SECK et FRERES
+            <h1 className="text-3xl font-bold font-[Chivo] tracking-tight mb-4" data-testid="login-company-name">
+              {settings.name}
             </h1>
             <p className="text-slate-300 max-w-md">
               Solution complète de gestion pour vos produits alimentaires. 
@@ -67,12 +70,10 @@ const LoginPage = () => {
         <div className="w-full max-w-md">
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-3 mb-8">
-            <div className="w-12 h-12 bg-green-600 rounded-sm flex items-center justify-center">
-              <Leaf className="w-8 h-8 text-white" />
-            </div>
+            <img src={logoUrl} alt={settings.name} className="w-12 h-12 rounded-sm object-cover" />
             <div>
               <h1 className="font-bold text-lg font-[Chivo] tracking-tight text-slate-900 leading-tight">
-                Wakeur Khadim Rassoul SECK et FRERES
+                {settings.name}
               </h1>
             </div>
           </div>

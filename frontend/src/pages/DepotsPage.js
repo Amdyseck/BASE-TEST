@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import api from "../lib/api";
+import { useConfirm } from "../contexts/ConfirmContext";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -31,6 +32,7 @@ import { toast } from "sonner";
 import { Plus, Edit, Trash2, Warehouse, MapPin, Package, ArrowRight } from "lucide-react";
 
 const DepotsPage = () => {
+  const confirm = useConfirm();
   const { isAdmin, isVendeur } = useAuth();
   const [depots, setDepots] = useState([]);
   const [products, setProducts] = useState([]);
@@ -94,7 +96,7 @@ const DepotsPage = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Êtes-vous sûr de vouloir supprimer ce dépôt ?")) return;
+    if (!(await confirm({ description: "Êtes-vous sûr de vouloir supprimer ce dépôt ?" }))) return;
     try {
       await api.delete(`/depots/${id}`);
       toast.success("Dépôt supprimé");

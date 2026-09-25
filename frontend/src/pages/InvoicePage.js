@@ -1,12 +1,15 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useSettings } from "../contexts/SettingsContext";
+import { PaymentBadge } from "../lib/paymentMethods";
 import api from "../lib/api";
 import { Button } from "../components/ui/button";
 import { toast } from "sonner";
-import { Printer, ArrowLeft, Receipt, FileText } from "lucide-react";
+import { ArrowLeft, Receipt, FileText, PlusCircle } from "lucide-react";
 
 const InvoicePage = () => {
   const { saleId } = useParams();
+  const { settings, logoUrl } = useSettings();
   const [sale, setSale] = useState(null);
   const [loading, setLoading] = useState(true);
   const [printMode, setPrintMode] = useState("ticket"); // ticket or a4
@@ -51,16 +54,24 @@ const InvoicePage = () => {
     });
   };
 
-  const getPaymentMethodLabel = (method) => {
-    const methods = {
-      especes: "Espèces",
-      wave: "Wave",
-      orange_money: "Orange Money",
-      cheque: "Chèque",
-      banque: "Banque",
-    };
-    return methods[method] || method;
-  };
+  const contactLine = [settings.address, settings.phone && `Tél: ${settings.phone}`, settings.email].filter(Boolean).join(" — ");
+  const legalLine = [settings.ninea && `NINEA: ${settings.ninea}`, settings.rc && `RC: ${settings.rc}`].filter(Boolean).join(" — ");
+
+  const CompanyHeader = ({ size = "sm" }) => (
+    <div className="flex items-center gap-3">
+      <img 
+        src={logoUrl} 
+        alt={settings.name} 
+        className={`${size === "lg" ? "w-14 h-14" : "w-10 h-10"} rounded-sm object-cover`}
+      />
+      <div>
+        <h1 className={`${size === "lg" ? "text-xl" : "text-base"} font-bold font-[Chivo] text-slate-900 leading-tight`}>{settings.name}</h1>
+        {settings.slogan && <p className="text-xs text-slate-500">{settings.slogan}</p>}
+        {contactLine && <p className="text-[10px] text-slate-500">{contactLine}</p>}
+        {legalLine && <p className="text-[10px] text-slate-500">{legalLine}</p>}
+      </div>
+    </div>
+  );
 
   if (loading) {
     return (
@@ -87,17 +98,7 @@ const InvoicePage = () => {
       {/* Header */}
       <div className="invoice-header">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img 
-              src="/logo.jpg" 
-              alt="Wakeur Khadim Rassoul SECK et FRERES" 
-              className="w-10 h-10 rounded-sm object-cover"
-            />
-            <div>
-              <h1 className="text-lg font-bold font-[Chivo] text-slate-900">Wakeur Khadim Rassoul SECK et FRERES</h1>
-              <p className="text-xs text-slate-500">Vos produits alimentaires de qualité</p>
-            </div>
-          </div>
+          <CompanyHeader />
           <div className="text-right">
             <p className="text-lg font-bold font-[Chivo] text-slate-900">FACTURE</p>
             <p className="font-mono text-sm text-slate-600">{sale.invoice_number}</p>
@@ -174,9 +175,7 @@ const InvoicePage = () => {
       <div className="mt-4 pt-3 border-t border-slate-200 text-sm">
         <div className="flex items-center gap-2">
           <span className="overline">Règlement:</span>
-          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
-            {getPaymentMethodLabel(sale.payment_method)}
-          </span>
+          <PaymentBadge method={sale.payment_method} />
         </div>
         {sale.amount_paid > 0 && (
           <div className="mt-1 text-xs text-slate-500">
@@ -187,8 +186,8 @@ const InvoicePage = () => {
 
       {/* Footer */}
       <div className="mt-4 pt-3 border-t border-slate-200 text-center text-xs text-slate-500">
-        <p>Merci pour votre achat!</p>
-        <p className="mt-1">Wakeur Khadim Rassoul SECK et FRERES</p>
+        <p>{settings.footer_note}</p>
+        <p className="mt-1">{settings.name}</p>
         <p className="mt-1 text-[10px]">Développé par Amdy SECK - 77 571 93 98</p>
       </div>
     </div>
@@ -205,6 +204,12 @@ const InvoicePage = () => {
           </Button>
         </Link>
         <div className="flex gap-2">
+          <Link to="/pos">
+            <Button variant="outline" className="rounded-sm" data-testid="new-invoice-btn">
+              <PlusCircle className="w-4 h-4 mr-2" />
+              Nouvelle facture
+            </Button>
+          </Link>
           <Button 
             onClick={() => handlePrint("ticket")} 
             variant="outline" 
@@ -231,17 +236,7 @@ const InvoicePage = () => {
           {/* Header */}
           <div className="invoice-header">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <img 
-                  src="/logo.jpg" 
-                  alt="Wakeur Khadim Rassoul SECK et FRERES" 
-                  className="w-14 h-14 rounded-sm object-cover"
-                />
-                <div>
-                  <h1 className="text-xl font-bold font-[Chivo] text-slate-900">Wakeur Khadim Rassoul SECK et FRERES</h1>
-                  <p className="text-sm text-slate-500">Vos produits alimentaires de qualité</p>
-                </div>
-              </div>
+              <CompanyHeader size="lg" />
               <div className="text-right">
                 <p className="text-2xl font-bold font-[Chivo] text-slate-900">FACTURE</p>
                 <p className="font-mono text-lg text-slate-600">{sale.invoice_number}</p>
@@ -320,9 +315,7 @@ const InvoicePage = () => {
           <div className="mt-8 pt-6 border-t border-slate-200">
             <div className="flex items-center gap-4">
               <span className="overline">Mode de règlement:</span>
-              <span className="px-3 py-1 rounded-full text-sm font-medium bg-slate-100 text-slate-700">
-                {getPaymentMethodLabel(sale.payment_method)}
-              </span>
+              <PaymentBadge method={sale.payment_method} className="text-sm px-3" />
             </div>
             {sale.amount_paid > 0 && (
               <div className="mt-2 text-sm text-slate-500">
@@ -333,8 +326,8 @@ const InvoicePage = () => {
 
           {/* Footer */}
           <div className="mt-8 pt-6 border-t border-slate-200 text-center text-sm text-slate-500">
-            <p>Merci pour votre achat!</p>
-            <p className="mt-1">Wakeur Khadim Rassoul SECK et FRERES - Vos produits alimentaires de qualité</p>
+            <p>{settings.footer_note}</p>
+            <p className="mt-1">{settings.name}{settings.slogan ? ` - ${settings.slogan}` : ""}</p>
             <p className="mt-2 text-xs">Développé par Amdy SECK - 77 571 93 98</p>
           </div>
         </div>

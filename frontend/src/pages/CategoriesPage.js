@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import api from "../lib/api";
+import { useConfirm } from "../contexts/ConfirmContext";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -24,6 +25,7 @@ import { toast } from "sonner";
 import { Plus, Edit, Trash2, FolderOpen } from "lucide-react";
 
 const CategoriesPage = () => {
+  const confirm = useConfirm();
   const { isAdmin, isVendeur } = useAuth();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -77,7 +79,7 @@ const CategoriesPage = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Êtes-vous sûr de vouloir supprimer cette famille ?")) return;
+    if (!(await confirm({ description: "Êtes-vous sûr de vouloir supprimer cette famille ?" }))) return;
     try {
       await api.delete(`/categories/${id}`);
       toast.success("Famille supprimée");
