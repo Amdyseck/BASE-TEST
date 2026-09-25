@@ -33,6 +33,8 @@ import { Plus, Search, Edit, Trash2, Package, Barcode, Warehouse } from "lucide-
 
 const ProductsPage = () => {
   const confirm = useConfirm();
+  const { can } = useAuth();
+  const canDelete = can("can_delete");
   const { isAdmin, isVendeur } = useAuth();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -493,7 +495,7 @@ const ProductsPage = () => {
                             <Edit className="w-4 h-4" />
                           </Button>
                         )}
-                        {isAdmin && (
+                          {canDelete && (
                           <Button
                             variant="ghost"
                             size="sm"

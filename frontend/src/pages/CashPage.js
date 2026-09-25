@@ -30,7 +30,8 @@ const formatDate = (dateStr) =>
 
 const CashPage = () => {
   const confirm = useConfirm();
-  const { isAdmin } = useAuth();
+  const { can } = useAuth();
+  const canDelete = can("can_delete");
   const [session, setSession] = useState(null);
   const [summary, setSummary] = useState(null);
   const [movements, setMovements] = useState([]);
@@ -219,7 +220,7 @@ const CashPage = () => {
                   <TableHead>Catégorie</TableHead>
                   <TableHead>Par</TableHead>
                   <TableHead className="text-right">Montant</TableHead>
-                  {isAdmin && <TableHead className="text-right">Actions</TableHead>}
+                  {canDelete && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -235,9 +236,9 @@ const CashPage = () => {
                     <TableCell className={`text-right font-mono font-medium ${m.type === "in" ? "text-green-700" : "text-red-600"}`}>
                       {m.type === "in" ? "+" : "-"}{formatCurrency(m.amount)}
                     </TableCell>
-                    {isAdmin && (
+                    {canDelete && (
                       <TableCell className="text-right">
-                        {m.is_manual && (
+                        {m.is_manual && canDelete && (
                           <Button variant="ghost" size="sm" onClick={() => handleDelete(m.id)} className="text-red-600" data-testid={`delete-movement-${m.id}`}>
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -247,7 +248,7 @@ const CashPage = () => {
                   </TableRow>
                 )) : (
                   <TableRow>
-                    <TableCell colSpan={isAdmin ? 6 : 5} className="text-center py-12">
+                    <TableCell colSpan={canDelete ? 6 : 5} className="text-center py-12">
                       <div className="empty-state">
                         <Banknote className="w-12 h-12 mx-auto text-slate-300 mb-3" />
                         <p>Aucun mouvement de caisse</p>

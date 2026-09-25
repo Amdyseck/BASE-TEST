@@ -26,6 +26,8 @@ import { Plus, Search, Edit, Trash2, Truck, Phone, Mail, User } from "lucide-rea
 
 const SuppliersPage = () => {
   const confirm = useConfirm();
+  const { can } = useAuth();
+  const canDelete = can("can_delete");
   const { isAdmin, isVendeur } = useAuth();
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -295,7 +297,7 @@ const SuppliersPage = () => {
                           <Edit className="w-4 h-4" />
                         </Button>
                       )}
-                      {isAdmin && (
+                        {canDelete && (
                         <Button
                           variant="ghost"
                           size="sm"

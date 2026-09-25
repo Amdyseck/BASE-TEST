@@ -26,6 +26,8 @@ import { Plus, Edit, Trash2, FolderOpen } from "lucide-react";
 
 const CategoriesPage = () => {
   const confirm = useConfirm();
+  const { can } = useAuth();
+  const canDelete = can("can_delete");
   const { isAdmin, isVendeur } = useAuth();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -206,7 +208,7 @@ const CategoriesPage = () => {
                           <Edit className="w-4 h-4" />
                         </Button>
                       )}
-                      {isAdmin && (
+                        {canDelete && (
                         <Button
                           variant="ghost"
                           size="sm"

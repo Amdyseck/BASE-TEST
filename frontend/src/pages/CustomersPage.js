@@ -26,7 +26,8 @@ import { Plus, Search, Edit, Trash2, Users, Phone, Mail } from "lucide-react";
 
 const CustomersPage = () => {
   const confirm = useConfirm();
-  const { isAdmin, isVendeur } = useAuth();
+  const { can } = useAuth();
+  const canDelete = can("can_delete");
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -285,7 +286,7 @@ const CustomersPage = () => {
                       >
                         <Edit className="w-4 h-4" />
                       </Button>
-                      {(isAdmin || isVendeur) && (
+                        {canDelete && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -295,7 +296,7 @@ const CustomersPage = () => {
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
-                      )}
+                        )}
                     </div>
                   </TableCell>
                 </TableRow>

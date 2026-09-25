@@ -19,13 +19,14 @@ import AccountsPage from "./pages/AccountsPage";
 import StatementPage from "./pages/StatementPage";
 import CashPage from "./pages/CashPage";
 import SettingsPage from "./pages/SettingsPage";
+import AuditPage from "./pages/AuditPage";
 import { SettingsProvider } from "./contexts/SettingsContext";
 import { ConfirmProvider } from "./contexts/ConfirmContext";
 import Layout from "./components/Layout";
 import "./App.css";
 
-const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { user, loading } = useAuth();
+const ProtectedRoute = ({ children, allowedRoles, module }) => {
+  const { user, loading, hasModule } = useAuth();
   
   if (loading) {
     return (
@@ -40,6 +41,10 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   }
   
   if (allowedRoles && !allowedRoles.includes(user.role)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  if (module && !hasModule(module)) {
     return <Navigate to="/dashboard" replace />;
   }
   
@@ -60,7 +65,7 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/accounts/:type/:id" element={
-            <ProtectedRoute>
+            <ProtectedRoute module="accounts">
               <StatementPage />
             </ProtectedRoute>
           } />
@@ -71,21 +76,26 @@ function App() {
           }>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardPage />} />
-            <Route path="products" element={<ProductsPage />} />
-            <Route path="categories" element={<CategoriesPage />} />
-            <Route path="customers" element={<CustomersPage />} />
-            <Route path="suppliers" element={<SuppliersPage />} />
-            <Route path="sales" element={<SalesPage />} />
-            <Route path="pos" element={<POSPage />} />
-            <Route path="orders" element={<OrdersPage />} />
-            <Route path="depots" element={<DepotsPage />} />
-            <Route path="bank-journal" element={<BankJournalPage />} />
-            <Route path="accounts" element={<AccountsPage />} />
-            <Route path="cash" element={<CashPage />} />
-            <Route path="reports" element={<ReportsPage />} />
+            <Route path="products" element={<ProtectedRoute module="products"><ProductsPage /></ProtectedRoute>} />
+            <Route path="categories" element={<ProtectedRoute module="categories"><CategoriesPage /></ProtectedRoute>} />
+            <Route path="customers" element={<ProtectedRoute module="customers"><CustomersPage /></ProtectedRoute>} />
+            <Route path="suppliers" element={<ProtectedRoute module="suppliers"><SuppliersPage /></ProtectedRoute>} />
+            <Route path="sales" element={<ProtectedRoute module="sales"><SalesPage /></ProtectedRoute>} />
+            <Route path="pos" element={<ProtectedRoute module="pos"><POSPage /></ProtectedRoute>} />
+            <Route path="orders" element={<ProtectedRoute module="purchases"><OrdersPage /></ProtectedRoute>} />
+            <Route path="depots" element={<ProtectedRoute module="depots"><DepotsPage /></ProtectedRoute>} />
+            <Route path="bank-journal" element={<ProtectedRoute module="bank"><BankJournalPage /></ProtectedRoute>} />
+            <Route path="accounts" element={<ProtectedRoute module="accounts"><AccountsPage /></ProtectedRoute>} />
+            <Route path="cash" element={<ProtectedRoute module="cash"><CashPage /></ProtectedRoute>} />
+            <Route path="reports" element={<ProtectedRoute module="reports"><ReportsPage /></ProtectedRoute>} />
             <Route path="users" element={
-              <ProtectedRoute allowedRoles={["admin"]}>
+              <ProtectedRoute allowedRoles={["admin", "gerant"]}>
                 <UsersPage />
+              </ProtectedRoute>
+            } />
+            <Route path="audit" element={
+              <ProtectedRoute allowedRoles={["admin", "gerant"]}>
+                <AuditPage />
               </ProtectedRoute>
             } />
             <Route path="settings" element={

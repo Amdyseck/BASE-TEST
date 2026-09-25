@@ -21,6 +21,7 @@ import {
   Wallet,
   Banknote,
   UserCog,
+  History,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import {
@@ -32,7 +33,7 @@ import {
 } from "./ui/dropdown-menu";
 
 const Layout = () => {
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, isManager, hasModule } = useAuth();
   const { settings, logoUrl } = useSettings();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -44,22 +45,25 @@ const Layout = () => {
 
   const navItems = [
     { to: "/dashboard", icon: LayoutDashboard, label: "Tableau de bord" },
-    { to: "/pos", icon: ShoppingCart, label: "Caisse" },
-    { to: "/cash", icon: Banknote, label: "Gestion caisse" },
-    { to: "/products", icon: Package, label: "Produits" },
-    { to: "/categories", icon: FolderOpen, label: "Familles" },
-    { to: "/sales", icon: Receipt, label: "Ventes" },
-    { to: "/customers", icon: Users, label: "Clients" },
-    { to: "/suppliers", icon: Truck, label: "Fournisseurs" },
-    { to: "/accounts", icon: Wallet, label: "Comptes tiers" },
-    { to: "/orders", icon: ClipboardList, label: "Achats" },
-    { to: "/depots", icon: Warehouse, label: "Dépôts" },
-    { to: "/bank-journal", icon: Landmark, label: "Journal Banque" },
-    { to: "/reports", icon: BarChart3, label: "Rapports" },
-  ];
+    { to: "/pos", icon: ShoppingCart, label: "Facturation", module: "pos" },
+    { to: "/cash", icon: Banknote, label: "Gestion caisse", module: "cash" },
+    { to: "/products", icon: Package, label: "Produits", module: "products" },
+    { to: "/categories", icon: FolderOpen, label: "Familles", module: "categories" },
+    { to: "/sales", icon: Receipt, label: "Ventes", module: "sales" },
+    { to: "/customers", icon: Users, label: "Clients", module: "customers" },
+    { to: "/suppliers", icon: Truck, label: "Fournisseurs", module: "suppliers" },
+    { to: "/accounts", icon: Wallet, label: "Comptes tiers", module: "accounts" },
+    { to: "/orders", icon: ClipboardList, label: "Achats", module: "purchases" },
+    { to: "/depots", icon: Warehouse, label: "Dépôts", module: "depots" },
+    { to: "/bank-journal", icon: Landmark, label: "Journal Banque", module: "bank" },
+    { to: "/reports", icon: BarChart3, label: "Rapports", module: "reports" },
+  ].filter((item) => !item.module || hasModule(item.module));
 
-  if (isAdmin) {
+  if (isManager) {
     navItems.push({ to: "/users", icon: UserCog, label: "Utilisateurs" });
+    navItems.push({ to: "/audit", icon: History, label: "Historique" });
+  }
+  if (isAdmin) {
     navItems.push({ to: "/settings", icon: Settings, label: "Paramètres" });
   }
 
@@ -117,7 +121,7 @@ const Layout = () => {
                 </div>
                 <div className="flex-1 text-left">
                   <p className="text-sm font-medium truncate">{user?.name}</p>
-                  <p className="text-xs text-slate-400 capitalize">{user?.role}</p>
+                  <p className="text-xs text-slate-400 capitalize">{{ admin: "Administrateur", gerant: "Gérant", vendeur: "Vendeur", caissier: "Caissier" }[user?.role] || user?.role}</p>
                 </div>
               </button>
             </DropdownMenuTrigger>

@@ -33,6 +33,8 @@ import { Plus, Edit, Trash2, Warehouse, MapPin, Package, ArrowRight } from "luci
 
 const DepotsPage = () => {
   const confirm = useConfirm();
+  const { can } = useAuth();
+  const canDelete = can("can_delete");
   const { isAdmin, isVendeur } = useAuth();
   const [depots, setDepots] = useState([]);
   const [products, setProducts] = useState([]);
@@ -377,7 +379,7 @@ const DepotsPage = () => {
                         <Edit className="w-4 h-4" />
                       </Button>
                     )}
-                    {isAdmin && (
+                      {canDelete && (
                       <Button
                         variant="ghost"
                         size="sm"

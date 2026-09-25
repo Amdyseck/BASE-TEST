@@ -8,7 +8,7 @@ import requests
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Response
 from pydantic import BaseModel
 
-from server import db, get_current_user, require_role, record_cash_movement, add_bank_entry
+from server import db, get_current_user, require_role, require_module, require_perm, record_cash_movement, add_bank_entry, log_audit
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -96,7 +96,9 @@ async def get_settings():
 
 @router.put("/settings")
 async def update_settings(data: CompanySettings, user: dict = Depends(require_role(["admin"]))):
+    before = await load_settings()
     await db.settings.update_one({"key": "company"}, {"$set": data.model_dump()}, upsert=True)
+    await log_audit(user, "update", "settings", "settings", "company", data.name, before={k: before.get(k) for k in data.model_dump()}, after=data.model_dump())
     return await get_settings()
 
 
@@ -238,7 +240,7 @@ async def current_session(user: dict = Depends(get_current_user)):
 
 
 @router.post("/cash/session/open")
-async def open_session(data: SessionOpen, user: dict = Depends(get_current_user)):
+async def open_session(data: SessionOpen, user: dict = Depends(require_module("cash"))):
     if await db.cash_sessions.find_one({"status": "open"}):
         raise HTTPException(status_code=400, detail="Une caisse est déjà ouverte")
     if data.opening_amount < 0:
@@ -262,7 +264,7 @@ async def open_session(data: SessionOpen, user: dict = Depends(get_current_user)
 
 
 @router.post("/cash/session/close")
-async def close_session(data: SessionClose, user: dict = Depends(get_current_user)):
+async def close_session(data: SessionClose, user: dict = Depends(require_module("cash"))):
     session = await db.cash_sessions.find_one({"status": "open"}, {"_id": 0})
     if not session:
         raise HTTPException(status_code=400, detail="Aucune caisse ouverte")
@@ -309,7 +311,7 @@ async def list_movements(session_id: Optional[str] = None, date: Optional[str] =
 
 
 @router.post("/cash/movements")
-async def create_movement(data: MovementCreate, user: dict = Depends(get_current_user)):
+async def create_movement(data: MovementCreate, user: dict = Depends(require_module("cash"))):
     if data.type not in ("in", "out"):
         raise HTTPException(status_code=400, detail="Type de mouvement invalide")
     if data.amount <= 0:
@@ -323,7 +325,7 @@ async def create_movement(data: MovementCreate, user: dict = Depends(get_current
 
 
 @router.delete("/cash/movements/{movement_id}")
-async def delete_movement(movement_id: str, user: dict = Depends(require_role(["admin"]))):
+async def delete_movement(movement_id: str, user: dict = Depends(require_perm("can_delete"))):
     movement = await db.cash_movements.find_one({"id": movement_id}, {"_id": 0})
     if not movement:
         raise HTTPException(status_code=404, detail="Mouvement non trouvé")
@@ -331,4 +333,5 @@ async def delete_movement(movement_id: str, user: dict = Depends(require_role(["
         raise HTTPException(status_code=400, detail="Seuls les mouvements manuels peuvent être supprimés")
     await db.cash_movements.delete_one({"id": movement_id})
     await db.bank_journal.delete_many({"related_entity_type": "cash_movement", "related_entity_id": movement_id})
+    await log_audit(user, "delete", "cash", "cash_movements", movement_id, movement.get("description", ""), before=movement)
     return {"message": "Mouvement supprimé"}

@@ -22,6 +22,10 @@ export const AuthProvider = ({ children }) => {
     if (token && storedUser) {
       setUser(JSON.parse(storedUser));
       api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      api.get("/auth/me").then((res) => {
+        localStorage.setItem("user", JSON.stringify(res.data));
+        setUser(res.data);
+      }).catch(() => {});
     }
     setLoading(false);
   }, []);
@@ -64,8 +68,12 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     isAdmin: user?.role === "admin",
+    isManager: user?.role === "admin" || user?.role === "gerant",
     isVendeur: user?.role === "vendeur",
     isCaissier: user?.role === "caissier",
+    permissions: user?.permissions || { modules: [] },
+    hasModule: (m) => user?.role === "admin" || (user?.permissions?.modules || []).includes(m),
+    can: (flag) => user?.role === "admin" || !!user?.permissions?.[flag],
   };
 
   return (

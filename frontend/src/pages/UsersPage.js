@@ -29,11 +29,24 @@ import {
   TableRow,
 } from "../components/ui/table";
 import { toast } from "sonner";
-import { Users, Shield, Trash2, Plus, Eye, EyeOff, Pencil, Key } from "lucide-react";
+import { Users, Shield, Trash2, Plus, Eye, EyeOff, Pencil, Key, ShieldCheck } from "lucide-react";
+import { Checkbox } from "../components/ui/checkbox";
+import { MODULE_LABELS } from "./AuditPage";
+
+const ROLE_OPTIONS = [
+  { value: "admin", label: "Administrateur" },
+  { value: "gerant", label: "Gérant" },
+  { value: "vendeur", label: "Vendeur" },
+  { value: "caissier", label: "Caissier" },
+];
+const EDITABLE_MODULES = ["pos", "sales", "products", "categories", "purchases", "customers", "suppliers", "accounts", "cash", "bank", "depots", "reports"];
 
 const UsersPage = () => {
   const confirm = useConfirm();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, isAdmin } = useAuth();
+  const [isPermDialogOpen, setIsPermDialogOpen] = useState(false);
+  const [permForm, setPermForm] = useState({ modules: [], can_delete: false, can_cancel_invoice: false, can_edit_prices: false, max_discount_percent: 0 });
+  const roleOptions = ROLE_OPTIONS.filter((r) => isAdmin || r.value !== "admin");
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -130,6 +143,37 @@ const UsersPage = () => {
     setIsEditDialogOpen(true);
   };
 
+  const openPermDialog = (user) => {
+    setSelectedUser(user);
+    const p = user.permissions || {};
+    setPermForm({
+      modules: p.modules || [],
+      can_delete: !!p.can_delete,
+      can_cancel_invoice: !!p.can_cancel_invoice,
+      can_edit_prices: !!p.can_edit_prices,
+      max_discount_percent: p.max_discount_percent ?? 0,
+    });
+    setIsPermDialogOpen(true);
+  };
+
+  const handleSavePermissions = async (e) => {
+    e.preventDefault();
+    if (!selectedUser) return;
+    try {
+      await api.put(`/users/${selectedUser.id}`, { permissions: permForm });
+      toast.success("Autorisations mises à jour");
+      setIsPermDialogOpen(false);
+      setSelectedUser(null);
+      fetchUsers();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Erreur lors de la mise à jour des autorisations");
+    }
+  };
+
+  const toggleModule = (m) => {
+    setPermForm((f) => ({ ...f, modules: f.modules.includes(m) ? f.modules.filter((x) => x !== m) : [...f.modules, m] }));
+  };
+
   const openPasswordDialog = (user) => {
     setSelectedUser(user);
     setNewPassword("");
@@ -160,11 +204,13 @@ const UsersPage = () => {
   const getRoleBadge = (role) => {
     const styles = {
       admin: "bg-purple-100 text-purple-700",
+      gerant: "bg-indigo-100 text-indigo-700",
       vendeur: "bg-blue-100 text-blue-700",
       caissier: "bg-green-100 text-green-700",
     };
     const labels = {
       admin: "Administrateur",
+      gerant: "Gérant",
       vendeur: "Vendeur",
       caissier: "Caissier",
     };
@@ -258,9 +304,7 @@ const UsersPage = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin">Administrateur</SelectItem>
-                    <SelectItem value="vendeur">Vendeur</SelectItem>
-                    <SelectItem value="caissier">Caissier</SelectItem>
+                    {roleOptions.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -301,9 +345,9 @@ const UsersPage = () => {
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="stat-card-label">Administrateurs</p>
+                <p className="stat-card-label">Administrateurs / Gérants</p>
                 <p className="stat-card-value">
-                  {users.filter((u) => u.role === "admin").length}
+                  {users.filter((u) => u.role === "admin" || u.role === "gerant").length}
                 </p>
               </div>
               <div className="w-12 h-12 bg-purple-100 rounded-sm flex items-center justify-center">
@@ -318,7 +362,7 @@ const UsersPage = () => {
               <div>
                 <p className="stat-card-label">Vendeurs / Caissiers</p>
                 <p className="stat-card-value">
-                  {users.filter((u) => u.role !== "admin").length}
+                  {users.filter((u) => u.role === "vendeur" || u.role === "caissier").length}
                 </p>
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-sm flex items-center justify-center">
@@ -360,7 +404,7 @@ const UsersPage = () => {
                 </TableCell>
                 <TableCell className="text-slate-500">{user.email}</TableCell>
                 <TableCell>
-                  {user.id === currentUser?.id ? (
+                  {user.id === currentUser?.id || (!isAdmin && user.role === "admin") ? (
                     getRoleBadge(user.role)
                   ) : (
                     <Select
@@ -371,16 +415,14 @@ const UsersPage = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="admin">Administrateur</SelectItem>
-                        <SelectItem value="vendeur">Vendeur</SelectItem>
-                        <SelectItem value="caissier">Caissier</SelectItem>
+                        {roleOptions.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   )}
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1">
-                    {user.id !== currentUser?.id && (
+                    {user.id !== currentUser?.id && (isAdmin || user.role !== "admin") && (
                       <>
                         <Button
                           variant="ghost"
@@ -391,6 +433,18 @@ const UsersPage = () => {
                         >
                           <Pencil className="w-4 h-4" />
                         </Button>
+                        {user.role !== "admin" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openPermDialog(user)}
+                            className="text-indigo-600 hover:text-indigo-700"
+                            title="Autorisations"
+                            data-testid={`perms-user-${user.id}`}
+                          >
+                            <ShieldCheck className="w-4 h-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -455,9 +509,7 @@ const UsersPage = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="admin">Administrateur</SelectItem>
-                  <SelectItem value="vendeur">Vendeur</SelectItem>
-                  <SelectItem value="caissier">Caissier</SelectItem>
+                  {roleOptions.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -473,6 +525,48 @@ const UsersPage = () => {
               <Button type="submit" className="btn-primary">
                 Enregistrer
               </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Permissions Dialog */}
+      <Dialog open={isPermDialogOpen} onOpenChange={setIsPermDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="font-[Chivo]">Autorisations — {selectedUser?.name}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSavePermissions} className="space-y-5" data-testid="permissions-form">
+            <div>
+              <Label className="overline block mb-2">Modules accessibles</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {EDITABLE_MODULES.filter((m) => !(selectedUser?.role === "caissier" && m === "pos")).map((m) => (
+                  <label key={m} className="flex items-center gap-2 text-sm p-2 border border-slate-200 rounded-sm cursor-pointer hover:bg-slate-50">
+                    <Checkbox checked={permForm.modules.includes(m)} onCheckedChange={() => toggleModule(m)} data-testid={`perm-module-${m}`} />
+                    {MODULE_LABELS[m]}
+                  </label>
+                ))}
+              </div>
+              {selectedUser?.role === "caissier" && <p className="text-xs text-slate-500 mt-2">Le caissier ne peut pas effectuer de ventes (module Facturation désactivé).</p>}
+            </div>
+            <div>
+              <Label className="overline block mb-2">Droits particuliers</Label>
+              <div className="space-y-2">
+                {[["can_delete", "Peut supprimer des éléments"], ["can_cancel_invoice", "Peut annuler / retourner une facture"], ["can_edit_prices", "Peut modifier les prix à la facturation"]].map(([k, l]) => (
+                  <label key={k} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <Checkbox checked={permForm[k]} onCheckedChange={(v) => setPermForm({ ...permForm, [k]: !!v })} data-testid={`perm-flag-${k}`} />
+                    {l}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="overline">Plafond de remise (%)</Label>
+              <Input type="number" min="0" max="100" value={permForm.max_discount_percent} onChange={(e) => setPermForm({ ...permForm, max_discount_percent: parseFloat(e.target.value) || 0 })} className="rounded-sm font-mono w-32" data-testid="perm-max-discount" />
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button type="button" variant="outline" onClick={() => setIsPermDialogOpen(false)} className="rounded-sm">Annuler</Button>
+              <Button type="submit" className="btn-primary" data-testid="save-permissions-btn">Enregistrer</Button>
             </div>
           </form>
         </DialogContent>

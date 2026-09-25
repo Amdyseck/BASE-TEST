@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import api from "../lib/api";
 import { useConfirm } from "../contexts/ConfirmContext";
+import { useAuth } from "../contexts/AuthContext";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -32,6 +33,8 @@ import { Landmark, Plus, Trash2, ArrowUpCircle, ArrowDownCircle, TrendingUp } fr
 
 const BankJournalPage = () => {
   const confirm = useConfirm();
+  const { can } = useAuth();
+  const canDelete = can("can_delete");
   const [entries, setEntries] = useState([]);
   const [summary, setSummary] = useState({ total_credits: 0, total_debits: 0, balance: 0 });
   const [loading, setLoading] = useState(true);
@@ -303,6 +306,7 @@ const BankJournalPage = () => {
                     {entry.entry_type === "credit" ? "+" : "-"}{formatCurrency(entry.amount)}
                   </TableCell>
                   <TableCell className="text-right">
+                    {canDelete && (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -311,6 +315,7 @@ const BankJournalPage = () => {
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))

@@ -40,7 +40,8 @@ import { Search, Receipt, FileText, CreditCard, XCircle, RotateCcw, Banknote, Sm
 
 const SalesPage = () => {
   const confirm = useConfirm();
-  const { isAdmin } = useAuth();
+  const { can } = useAuth();
+  const canCancel = can("can_cancel_invoice");
   const [sales, setSales] = useState([]);
   const [unpaidSales, setUnpaidSales] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -254,7 +255,7 @@ const SalesPage = () => {
                               <CreditCard className="w-4 h-4" />
                             </Button>
                           )}
-                          {isAdmin && sale.status !== 'cancelled' && (
+                          {canCancel && sale.status !== 'cancelled' && (
                             <Button 
                               variant="ghost" 
                               size="sm" 
