@@ -445,7 +445,7 @@ const POSPage = () => {
                       key={method.value}
                       variant={paymentMethod === method.value ? "default" : "outline"}
                       onClick={() => setPaymentMethod(method.value)}
-                      className={`rounded-sm text-xs ${paymentMethod === method.value ? paymentButtonClass(method.value) : ""}`}
+                      className={`rounded-sm text-xs ${paymentButtonClass(method.value, paymentMethod === method.value)}`}
                       data-testid={`payment-${method.value}`}
                     >
                       <method.icon className="w-3 h-3 mr-1" />

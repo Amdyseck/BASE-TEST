@@ -14,6 +14,11 @@ Contrainte : ne pas traduire WAVE, Orange Money, etc. Langue : français.
 - Rapports : comptes tiers (soldes clients et fournisseurs)
 - 2026-06 : Rebranding complet INTERTRADE TOUBA → Wakeur Khadim Rassoul SECK et FRERES (UI, factures, titre, API, logo `/logo.jpg`, emails utilisateurs migrés vers `@wakeur.sn`, données historiques nettoyées)
 
+- 2026-06 : Comptes tiers (page dédiée : soldes clients/fournisseurs, relevé de compte imprimable `/accounts/:type/:id`, encaissement/règlement direct avec imputation FIFO sur factures impayées + mouvement caisse/journal banque)
+- 2026-06 : Gestion de caisse (`/cash` : ouverture avec fond de caisse, mouvements manuels dépense/apport/versement banque, journal de caisse alimenté automatiquement par ventes et règlements espèces, clôture avec écart, historique). Bannière POS si caisse fermée.
+- 2026-06 : Paramètres société (`/settings`, admin) : nom, slogan, adresse, tél, email, NINEA, RC, pied de facture, logo téléversé (Emergent Object Storage) → sidebar, login, factures, relevés
+- 2026-06 : Couleurs des modes de paiement (Espèces vert, WAVE bleu, Orange Money orange, Chèque slate, Banque indigo) sur POS/Ventes/Achats + badges ; boîte de dialogue de confirmation (AlertDialog) pour toutes les suppressions/annulations ; bouton « Nouvelle facture » sur la facture
+
 ## Backlog
 - P2 : découper `server.py` en routers modulaires
 - P2 : tests frontend automatisés

@@ -1,0 +1,62 @@
+{
+  "summary": "Comprehensive testing of NEW features for Wakeur Khadim Rassoul SECK et FRERES: company settings + logo upload, cash sessions/movements, POS cash-integrated sales, customer/supplier statements, FIFO customer/supplier payments with cash and bank hooks, and UI confirm dialogs. 28/28 pytest backend tests pass. Frontend UI flows on /settings, /cash, /pos, /accounts and /accounts/customer/:id/statement all working with proper data-testid selectors.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dialogs (cash movement, open/close session, confirm)", "issues": ["Radix Dialog accessibility warning: 'Missing Description or aria-describedby for DialogContent' - minor a11y issue, add DialogDescription or aria-describedby to DialogContent components"]}
+    ]
+  },
+  "passed_tests": [
+    "GET /api/settings public (200) with has_logo flag",
+    "PUT /api/settings admin updates name/phone/ninea/rc/etc",
+    "GET /api/settings/logo returns 200 image/*",
+    "DELETE + POST /api/settings/logo (multipart) restores logo",
+    "Cash session lifecycle: current null -> open (50000) -> second open 400 -> close with expected_amount calculated -> movement when closed 400",
+    "POST /api/cash/movements manual 'depense' and 'apport' work; 0 amount -> 400",
+    "POST /api/cash/movements with category 'versement_banque' out creates a linked bank_journal credit entry",
+    "DELETE /api/cash/movements/{id} admin OK for manual movements",
+    "GET /api/cash/sessions lists closed sessions",
+    "POS espèces sale creates cash movement 'in' tied to open session (session_id set)",
+    "POST /api/payments customer espèces: allocates FIFO to unpaid sale, sale.is_paid true, balance_due 0, customer.balance decremented, cash movement 'in' created",
+    "POST /api/payments customer banque: creates bank_journal credit entry",
+    "POST /api/payments supplier espèces: allocations returned, cash movement 'out' created",
+    "POST /api/payments amount<=0 -> 400",
+    "GET /api/accounts/customer/{id}/statement returns entity, lines with progressive balance, totals.balance == customer.balance",
+    "GET /api/accounts/supplier/{id}/statement works",
+    "Invalid entity_type -> 400, unknown id -> 404",
+    "Frontend login as admin, sidebar shows company name (data-testid sidebar-company-name) and logo (data-testid sidebar-logo)",
+    "Settings page save updates and re-restore original name/phone",
+    "Cash page: open session, add movement, delete movement triggers confirm-dialog with confirm-cancel-btn (cancel) then confirm-accept-btn (accept), close session",
+    "POS: pos-cash-closed-banner visible when caisse fermée",
+    "Payment button colors: payment-orange_money has bg-orange-500, payment-wave has bg-blue-600, payment-especes has bg-green-*",
+    "Accounts page loads with statement-btn-*; Statement page shows statement-balance and print-statement-btn"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_new_features_v2.py",
+    "/app/test_reports/pytest/iter2_results.xml"
+  ],
+  "action_items": [
+    "OPTIONAL a11y: Add DialogDescription / aria-describedby to Radix Dialog components (cash open/close, movement form, confirm dialog) to remove console warnings."
+  ],
+  "critical_code_review_comments": [
+    "extra_routes.py account_statement: for customer, both sale.amount_paid (initial payment on sale) AND separate sale_payments (via POST /sales/{id}/payment) AND direct_payments allocations are combined; logic looks correct but could double-count if `entity_type='sale'` payments are also allocated by direct customer payment (the 'later' subtractor guards against this - OK).",
+    "record_cash_movement silently returns None when amount<=0 (no error), which is acceptable but callers may want a stricter check.",
+    "server.py is >1500 lines - consider splitting into modules (auth, sales, purchases, cash) for maintainability.",
+    "MongoDB _id is properly excluded via {'_id': 0} projections throughout - good.",
+    "settings.py logo storage properly uses env-based EMERGENT_LLM_KEY and INTEGRATION_PROXY_URL, no hardcoded credentials."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_new_features_v2.py"
+  ],
+  "success_rate": {"backend": "100% (28/28 pytest)", "frontend": "100% (all critical UI flows verified)"},
+  "test_credentials": "admin@wakeur.sn / admin123",
+  "seed_data_creation": "Created 1 TEST_ClientCompte customer + 2 credit sales during tests; TEST_ClientCompte deleted at end. Cash session was opened and properly closed at end. Logo re-uploaded from /app/frontend/public/logo.jpg (jpeg) so a logo remains in place as required.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend: use /app/backend/tests/test_new_features_v2.py (pytest). All new features are functional. Frontend confirm-dialog with data-testid confirm-dialog/confirm-accept-btn/confirm-cancel-btn works via ConfirmContext. Note some Radix DialogDescription a11y warnings in console but non-blocking. Cash session must always be closed at end of tests; logo must remain uploaded."
+}
