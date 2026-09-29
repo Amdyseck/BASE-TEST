@@ -1,0 +1,42 @@
+{
+  "summary": "Iteration 6: client/supplier advances, apply-advance, payment_method='avance' on sales & supplier invoices, statement labels, app-footer. Backend 11/11 pytest passed. Frontend verified live for admin + caissier: footer visible on all authenticated pages (dashboard, /accounts, /pos, /cash) and hidden on /login; AccountsPage advance flow (advance-btn -> form -> submit -> advance-badge + apply-advance-btn visible for customers with advance); POSPage shows advance-notice + payment-avance button when selected customer has advance, advance-pay-notice hides input-amount-paid on avance mode; CashPage open-advance-btn opens dialog with advance-type-select + advance-entity-select.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "passed_tests": [
+    "BACKEND POST /api/payments customer is_advance=true 20000 -> kind='advance', allocations=[], customer balance=-20000, cash 'in' 'Avance client' movement created",
+    "BACKEND POST /api/payments payment_method='avance' (without is_advance) -> 400 as expected",
+    "BACKEND POST /api/payments supplier is_advance=true 5000 -> supplier balance=-5000, cash 'out' 'Avance fournisseur' movement",
+    "BACKEND POST /api/sales customer payment_method='avance' amount_paid=0 for total 12500 with advance 20000 -> amount_paid=12500, balance_due=0, is_paid=true, customer balance=-7500, NO cash movement",
+    "BACKEND POST /api/sales customer especes amount_paid=15000 for total 12500 -> sale.amount_paid=12500, balance_due=0, customer balance=-2500, statement contains 'Avance / dépôt client' credit=2500",
+    "BACKEND POST /api/sales customer non_paye total 12500 with existing advance 10000 -> amount_paid=10000 (auto), balance_due=2500, customer balance=+2500, statement totals.balance matches entity.balance",
+    "BACKEND apply-advance: after non_paye 2500 + advance 8000 (balance=-5500) -> applied=2500, remaining_advance=3000, sale.is_paid=true, balance unchanged (-5500). Second call -> 400; no-advance client -> 400",
+    "BACKEND POST /api/sales/{id}/payment?payment_method=avance sufficient advance -> 200, customer balance unchanged, no cash movement; insufficient advance -> 400 'Avance disponible insuffisante'",
+    "BACKEND POST /api/supplier-invoices/{id}/payment?payment_method=avance sufficient advance (10000 adv, 4000 invoice, pay 3000) -> 200, supplier balance unchanged; amount>avance -> 400",
+    "BACKEND GET /api/reports/daily -> by_method does not contain 'avance' key",
+    "FRONTEND admin /accounts: 17 advance-badge-{id} and 17 apply-advance-btn-{id} rendered for TEST_ADV customers with negative balance; advance-btn opens advance-form (advance-amount-input + advance-method-select + advance-submit-btn) -> submit -> badge updates",
+    "FRONTEND admin /pos: selecting customer with advance shows advance-notice ('Avance disponible : 20 000 F CFA') and payment-avance button; clicking payment-avance shows advance-pay-notice and hides input-amount-paid",
+    "FRONTEND caissier /cash: open-advance-btn opens dialog with advance-type-select + advance-entity-select",
+    "FRONTEND app-footer visible on /dashboard, /accounts, /pos, /cash with texts 'Ce logiciel est créé par Amdy SECK', 'Copyright © IBM', '77 571 93 98'; absent on /login (login has its own footer text)"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_iter6_advances.py",
+    "/app/test_reports/pytest/iter6.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.create_payment correctly gates payment_method='avance' out of raw POST /api/payments (only allowed via is_advance=true which flips label + skips FIFO allocation).",
+    "create_sale computes excess_deposit only when payment_method not in ('avance','non_paye'), which prevents phantom deposit on credit sales — good.",
+    "create_sale auto_advance path also records a Payment entity_type='sale' payment_method='avance' so it appears in statement history — good.",
+    "add_sale_payment & pay_supplier_invoice with payment_method='avance': balance_delta correctly excludes the amount (no impact on entity balance since the advance already deducted it).",
+    "extra_routes.account_statement uses info_amount (credit=0) for 'Facture réglée par avance' lines and label 'Avance / dépôt client' for deposit — matches spec.",
+    "Frontend PAYMENT_METHODS.visibleMethods filters 'avance' unless advanceAvailable>0 — good UX.",
+    "server.py is 1749 lines — beyond 700-line guideline; consider splitting sales/payments/advances into separate routers (non-blocking)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter6_advances.py"],
+  "success_rate": {"backend": "100% (11/11 pytest)", "frontend": "100% (all iter6 flows verified admin + caissier)"},
+  "test_credentials": "admin@wakeur.sn/admin123, caissier.test@wakeur.sn/test1234 (unchanged)",
+  "seed_data_creation": "Created ~17 TEST_ADV_C_* customers (customer advances registered, some with negative balance = advance disponible) and 2 TEST_ADV_S_* suppliers. Test sales created for advance flows (avance / non_paye / especes with excess). Cash session left OPEN as instructed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend regression: /app/backend/tests/test_iter6_advances.py (11 tests). Run with REACT_APP_BACKEND_URL exported. To inspect advance UI, filter /accounts by 'TEST_ADV' — multiple customers with advance available and unpaid balance exist to exercise apply-advance and pay-by-avance flows."
+}

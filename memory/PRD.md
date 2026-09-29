@@ -28,6 +28,11 @@ Contrainte : ne pas traduire WAVE, Orange Money, etc. Langue : français.
 
 - 2026-06 : Gestion de caisse en temps quasi réel : actualisation automatique toutes les 10 s (et au retour sur la fenêtre) des factures à régler, mouvements et session ; indicateur « Actualisé à HH:MM:SS » + bouton manuel ; le caissier est dirigé directement sur Gestion de caisse à la connexion.
 
+- 2026-06 : Encaissement rapide par N° de facture (saisie/scan) dans Gestion de caisse ; notification sonore + toast à l'arrivée d'une nouvelle facture (bouton mute) ; Rapport journalier (Rapports, onglet par défaut : ventes, par mode de paiement, caisse, banque, factures, top articles, sessions ; Excel + impression) ; mode de règlement « Non payé » (client obligatoire).
+- 2026-06 : Avances clients/fournisseurs : enregistrement (Comptes tiers, Gestion de caisse), utilisation à la facturation (« Avance client » ou imputation automatique), excédent de règlement conservé en avance, imputation FIFO sur factures impayées, règlement de facture par avance ; relevé de compte adapté.
+- 2026-06 : Barre fixe en bas « Ce logiciel est créé par Amdy SECK | Copyright © IBM | 77 571 93 98 ».
+- 2026-06 : Historique des ventes : filtre par période (dates + raccourcis Aujourd'hui / Cette semaine / Ce mois) avec total et reste dû de la période.
+
 ## Backlog
 - P2 : découper `server.py` en routers modulaires
 - P2 : tests frontend automatisés

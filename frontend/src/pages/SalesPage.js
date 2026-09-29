@@ -36,7 +36,7 @@ import {
   TabsTrigger,
 } from "../components/ui/tabs";
 import { toast } from "sonner";
-import { Search, Receipt, FileText, CreditCard, XCircle, RotateCcw, Banknote, Smartphone } from "lucide-react";
+import { Search, Receipt, FileText, CreditCard, XCircle, RotateCcw, Banknote, Smartphone, CalendarDays, X } from "lucide-react";
 
 const SalesPage = () => {
   const confirm = useConfirm();
@@ -47,6 +47,21 @@ const SalesPage = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
+  const toISODate = (d) => d.toISOString().slice(0, 10);
+  const applyPreset = (preset) => {
+    const now = new Date();
+    if (preset === "today") { setStartDate(toISODate(now)); setEndDate(toISODate(now)); }
+    else if (preset === "week") { const d = new Date(now); d.setDate(now.getDate() - ((now.getDay() + 6) % 7)); setStartDate(toISODate(d)); setEndDate(toISODate(now)); }
+    else if (preset === "month") { setStartDate(toISODate(new Date(now.getFullYear(), now.getMonth(), 1))); setEndDate(toISODate(now)); }
+    else { setStartDate(""); setEndDate(""); }
+  };
+  const inPeriod = (s) => {
+    const d = new Date(s.created_at).toISOString().slice(0, 10);
+    return (!startDate || d >= startDate) && (!endDate || d <= endDate);
+  };
   
   // Payment dialog
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
@@ -140,8 +155,35 @@ const SalesPage = () => {
 
   const filteredSales = (activeTab === "unpaid" ? unpaidSales : sales).filter(
     (s) =>
-      s.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())
+      inPeriod(s) &&
+      (s.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+  const periodTotal = filteredSales.filter((s) => s.status !== "cancelled").reduce((sum, s) => sum + (s.total || 0), 0);
+  const periodDue = filteredSales.filter((s) => s.status !== "cancelled").reduce((sum, s) => sum + (s.balance_due || 0), 0);
+
+  const periodFilter = (
+    <div className="flex flex-col lg:flex-row lg:items-center gap-3 mt-3 pt-3 border-t border-slate-100" data-testid="period-filter">
+      <div className="flex items-center gap-2 text-sm text-slate-500"><CalendarDays className="w-4 h-4" /> Période</div>
+      <div className="flex items-center gap-2">
+        <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="rounded-sm w-40" data-testid="sales-start-date" />
+        <span className="text-slate-400">→</span>
+        <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="rounded-sm w-40" data-testid="sales-end-date" />
+      </div>
+      <div className="flex flex-wrap gap-1">
+        <Button type="button" variant="outline" size="sm" className="rounded-sm text-xs" onClick={() => applyPreset("today")} data-testid="preset-today">Aujourd'hui</Button>
+        <Button type="button" variant="outline" size="sm" className="rounded-sm text-xs" onClick={() => applyPreset("week")} data-testid="preset-week">Cette semaine</Button>
+        <Button type="button" variant="outline" size="sm" className="rounded-sm text-xs" onClick={() => applyPreset("month")} data-testid="preset-month">Ce mois</Button>
+        {(startDate || endDate) && (
+          <Button type="button" variant="ghost" size="sm" className="rounded-sm text-xs text-red-600" onClick={() => applyPreset("all")} data-testid="preset-clear"><X className="w-3 h-3 mr-1" /> Effacer</Button>
+        )}
+      </div>
+      <div className="lg:ml-auto flex items-center gap-4 text-sm">
+        <span className="text-slate-500">{filteredSales.length} facture{filteredSales.length > 1 ? "s" : ""}</span>
+        <span className="text-slate-500">Total : <span className="font-mono font-bold text-slate-900" data-testid="period-total">{formatCurrency(periodTotal)}</span></span>
+        {periodDue > 0 && <span className="text-slate-500">Reste dû : <span className="font-mono font-bold text-orange-600" data-testid="period-due">{formatCurrency(periodDue)}</span></span>}
+      </div>
+    </div>
   );
 
   const paymentMethods = [
@@ -200,6 +242,7 @@ const SalesPage = () => {
                   data-testid="search-sales"
                 />
               </div>
+              {periodFilter}
             </CardContent>
           </Card>
 
@@ -296,8 +339,10 @@ const SalesPage = () => {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10 rounded-sm"
+                  data-testid="search-unpaid-sales"
                 />
               </div>
+              {periodFilter}
             </CardContent>
           </Card>
 
