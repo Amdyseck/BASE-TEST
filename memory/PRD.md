@@ -33,6 +33,8 @@ Contrainte : ne pas traduire WAVE, Orange Money, etc. Langue : français.
 - 2026-06 : Barre fixe en bas « Ce logiciel est créé par Amdy SECK | Copyright © IBM | 77 571 93 98 ».
 - 2026-06 : Historique des ventes : filtre par période (dates + raccourcis Aujourd'hui / Cette semaine / Ce mois) avec total et reste dû de la période.
 
+- 2026-06 : Export des ventes filtrées (période / non payées / recherche) en Excel + impression PDF ; reçu d'avance / de règlement imprimable (80mm) avec avance disponible et reste dû (`/receipt/:paymentId`, ouvert automatiquement après une avance ou un encaissement) ; widget « Alerte stock » sur le tableau de bord (ruptures + stocks faibles) avec envoi WhatsApp au gérant (numéro « Téléphone alertes » dans Paramètres).
+
 ## Backlog
 - P2 : découper `server.py` en routers modulaires
 - P2 : tests frontend automatisés

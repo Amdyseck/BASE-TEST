@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import api from "../lib/api";
 import { paymentButtonClass } from "../lib/paymentMethods";
 import { useConfirm } from "../contexts/ConfirmContext";
+import { downloadFile } from "../lib/download";
 import { useAuth } from "../contexts/AuthContext";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -36,7 +37,7 @@ import {
   TabsTrigger,
 } from "../components/ui/tabs";
 import { toast } from "sonner";
-import { Search, Receipt, FileText, CreditCard, XCircle, RotateCcw, Banknote, Smartphone, CalendarDays, X } from "lucide-react";
+import { Search, Receipt, FileText, CreditCard, XCircle, RotateCcw, Banknote, Smartphone, CalendarDays, X, FileSpreadsheet, Printer } from "lucide-react";
 
 const SalesPage = () => {
   const confirm = useConfirm();
@@ -159,11 +160,24 @@ const SalesPage = () => {
       (s.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         s.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+  const handleExport = async () => {
+    const params = new URLSearchParams();
+    if (startDate) params.append("start_date", startDate);
+    if (endDate) params.append("end_date", endDate);
+    if (activeTab === "unpaid") params.append("unpaid_only", "true");
+    if (searchTerm) params.append("search", searchTerm);
+    try {
+      await downloadFile(`/export/sales.xlsx?${params.toString()}`, "ventes.xlsx");
+    } catch (error) {
+      toast.error("Erreur lors de l'export");
+    }
+  };
+
   const periodTotal = filteredSales.filter((s) => s.status !== "cancelled").reduce((sum, s) => sum + (s.total || 0), 0);
   const periodDue = filteredSales.filter((s) => s.status !== "cancelled").reduce((sum, s) => sum + (s.balance_due || 0), 0);
 
   const periodFilter = (
-    <div className="flex flex-col lg:flex-row lg:items-center gap-3 mt-3 pt-3 border-t border-slate-100" data-testid="period-filter">
+    <div className="flex flex-col lg:flex-row lg:items-center gap-3 mt-3 pt-3 border-t border-slate-100 print-keep" data-testid="period-filter">
       <div className="flex items-center gap-2 text-sm text-slate-500"><CalendarDays className="w-4 h-4" /> Période</div>
       <div className="flex items-center gap-2">
         <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="rounded-sm w-40" data-testid="sales-start-date" />
@@ -177,6 +191,10 @@ const SalesPage = () => {
         {(startDate || endDate) && (
           <Button type="button" variant="ghost" size="sm" className="rounded-sm text-xs text-red-600" onClick={() => applyPreset("all")} data-testid="preset-clear"><X className="w-3 h-3 mr-1" /> Effacer</Button>
         )}
+      </div>
+      <div className="flex gap-1 no-print">
+        <Button type="button" variant="outline" size="sm" className="rounded-sm text-xs" onClick={handleExport} data-testid="export-sales-excel-btn"><FileSpreadsheet className="w-3.5 h-3.5 mr-1" /> Excel</Button>
+        <Button type="button" variant="outline" size="sm" className="rounded-sm text-xs" onClick={() => window.print()} data-testid="print-sales-btn"><Printer className="w-3.5 h-3.5 mr-1" /> PDF</Button>
       </div>
       <div className="lg:ml-auto flex items-center gap-4 text-sm">
         <span className="text-slate-500">{filteredSales.length} facture{filteredSales.length > 1 ? "s" : ""}</span>

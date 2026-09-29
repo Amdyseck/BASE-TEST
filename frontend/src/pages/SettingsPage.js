@@ -14,6 +14,7 @@ const FIELDS = [
   { key: "name", label: "Nom de l'entreprise", required: true },
   { key: "slogan", label: "Slogan" },
   { key: "phone", label: "Téléphone", placeholder: "Ex: 77 000 00 00" },
+  { key: "alert_phone", label: "Téléphone alertes (gérant, WhatsApp)", placeholder: "Ex: 77 000 00 00" },
   { key: "email", label: "Email", type: "email" },
   { key: "ninea", label: "NINEA" },
   { key: "rc", label: "Registre de commerce (RC)" },

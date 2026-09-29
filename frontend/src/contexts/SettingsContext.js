@@ -14,6 +14,7 @@ const DEFAULTS = {
   ninea: "",
   rc: "",
   footer_note: "Merci pour votre achat!",
+  alert_phone: "",
   has_logo: false,
   logo_updated_at: null,
 };

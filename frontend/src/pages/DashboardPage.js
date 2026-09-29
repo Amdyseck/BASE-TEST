@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import api from "../lib/api";
 import { OverdueReminders } from "../components/OverdueReminders";
+import { StockAlerts } from "../components/StockAlerts";
 import { useSettings } from "../contexts/SettingsContext";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -147,7 +148,10 @@ const DashboardPage = () => {
         </Card>
       </div>
 
-      <OverdueReminders companyName={settings.name} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <OverdueReminders companyName={settings.name} />
+        <StockAlerts />
+      </div>
 
       {/* Secondary stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

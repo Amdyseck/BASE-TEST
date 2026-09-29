@@ -181,3 +181,9 @@ body > a[style*="fixed"][style*="bottom"][style*="right"] {
         padding: 0 !important;
     }
 }
+
+@media print {
+    [data-testid="sales-page"] .no-print, [data-testid="sales-page"] input, [data-testid="sales-page"] [role="tablist"] {
+        display: none !important;
+    }
+}

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../lib/api";
 import { SETTLEMENT_METHODS, paymentBadgeClass } from "../lib/paymentMethods";
 import { Button } from "./ui/button";
@@ -17,6 +18,7 @@ export const AdvanceDialog = ({ open, onOpenChange, entity = null, entityType = 
   const [entityId, setEntityId] = useState(entity?.id || "");
   const [form, setForm] = useState({ amount: "", payment_method: "especes", reference: "", notes: "" });
   const [saving, setSaving] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!open) return;
@@ -45,10 +47,11 @@ export const AdvanceDialog = ({ open, onOpenChange, entity = null, entityType = 
     }
     setSaving(true);
     try {
-      await api.post("/payments", { entity_type: type, entity_id: entityId, amount, payment_method: form.payment_method, reference: form.reference, notes: form.notes, is_advance: true });
+      const r = await api.post("/payments", { entity_type: type, entity_id: entityId, amount, payment_method: form.payment_method, reference: form.reference, notes: form.notes, is_advance: true });
       toast.success(type === "customer" ? "Avance client enregistrée" : "Avance fournisseur enregistrée");
       onOpenChange(false);
       onSaved?.();
+      navigate(`/receipt/${r.data.id}`);
     } catch (error) {
       toast.error(error.response?.data?.detail || "Erreur lors de l'enregistrement");
     } finally {

@@ -300,3 +300,35 @@ async def export_cash(session_id: Optional[str] = None, date: Optional[str] = No
     rows.append(["", "TOTAUX", "", "", "", round(total_in, 2), round(total_out, 2)])
     rows.append(["", "NET", "", "", "", round(total_in - total_out, 2), None])
     return build_workbook("Journal de caisse", ["Date", "Description", "Catégorie", "Référence", "Par", "Entrée", "Sortie"], rows, settings["name"], subtitle)
+
+
+STATUS_LABELS = {"completed": "Payée", "unpaid": "Non payée", "partial": "Partielle", "cancelled": "Annulée"}
+
+
+@router.get("/export/sales.xlsx")
+async def export_sales(start_date: Optional[str] = None, end_date: Optional[str] = None, unpaid_only: bool = False, search: Optional[str] = None, user: dict = Depends(require_module("sales"))):
+    query = {}
+    if start_date or end_date:
+        query["created_at"] = {}
+        if start_date:
+            query["created_at"]["$gte"] = f"{start_date}T00:00:00"
+        if end_date:
+            query["created_at"]["$lte"] = f"{end_date}T23:59:59.999999"
+    if unpaid_only:
+        query["balance_due"] = {"$gt": 0}
+        query["status"] = {"$ne": "cancelled"}
+    sales = await db.sales.find(query, {"_id": 0}).sort("created_at", -1).to_list(20000)
+    if search:
+        q = search.lower()
+        sales = [s for s in sales if q in (s.get("invoice_number") or "").lower() or q in (s.get("customer_name") or "").lower()]
+    settings = await load_settings()
+    method_labels = {"especes": "Espèces", "wave": "WAVE", "orange_money": "Orange Money", "cheque": "Chèque", "banque": "Banque", "non_paye": "Non payé", "avance": "Avance"}
+    rows = []
+    for s in sales:
+        status = "Annulée" if s.get("status") == "cancelled" else "Payée" if s.get("is_paid") else "Partielle" if s.get("amount_paid", 0) > 0 else "Non payée"
+        rows.append([fmt_dt(s["created_at"]), s.get("invoice_number"), s.get("customer_name") or "Client Comptoir", s.get("cashier_name", ""), method_labels.get(s.get("payment_method"), s.get("payment_method")), status, s.get("subtotal", s.get("total", 0)), s.get("discount", 0), s.get("total", 0), s.get("amount_paid", 0), s.get("balance_due", 0)])
+    active = [s for s in sales if s.get("status") != "cancelled"]
+    rows.append([])
+    rows.append(["TOTAUX", f"{len(active)} factures", "", "", "", "", None, round(sum(s.get("discount", 0) for s in active), 2), round(sum(s.get("total", 0) for s in active), 2), round(sum(s.get("amount_paid", 0) for s in active), 2), round(sum(s.get("balance_due", 0) for s in active), 2)])
+    subtitle = " ".join(filter(None, [f"du {start_date}" if start_date else "", f"au {end_date}" if end_date else "", "(non payées)" if unpaid_only else ""])) or "Toutes les ventes"
+    return build_workbook("Ventes", ["Date", "N° facture", "Client", "Caissier", "Mode", "Statut", "Sous-total", "Remise", "Total", "Payé", "Reste dû"], rows, settings["name"], subtitle)

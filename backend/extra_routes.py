@@ -63,6 +63,7 @@ DEFAULT_SETTINGS = {
     "ninea": "",
     "rc": "",
     "footer_note": "Merci pour votre achat!",
+    "alert_phone": "",
     "logo_path": None,
     "logo_content_type": None,
     "logo_updated_at": None,
@@ -78,6 +79,7 @@ class CompanySettings(BaseModel):
     ninea: Optional[str] = ""
     rc: Optional[str] = ""
     footer_note: Optional[str] = ""
+    alert_phone: Optional[str] = ""
 
 
 async def load_settings() -> dict:
@@ -344,3 +346,29 @@ async def delete_movement(movement_id: str, user: dict = Depends(require_perm("c
     await db.bank_journal.delete_many({"related_entity_type": "cash_movement", "related_entity_id": movement_id})
     await log_audit(user, "delete", "cash", "cash_movements", movement_id, movement.get("description", ""), before=movement)
     return {"message": "Mouvement supprimé"}
+
+
+# ==================== PAYMENT RECEIPT ====================
+
+@router.get("/payments/{payment_id}")
+async def get_payment(payment_id: str, user: dict = Depends(get_current_user)):
+    payment = await db.payments.find_one({"id": payment_id}, {"_id": 0})
+    if not payment:
+        raise HTTPException(status_code=404, detail="Paiement non trouvé")
+    entity = None
+    if payment.get("entity_type") == "customer":
+        entity = await db.customers.find_one({"id": payment["entity_id"]}, {"_id": 0})
+    elif payment.get("entity_type") == "supplier":
+        entity = await db.suppliers.find_one({"id": payment["entity_id"]}, {"_id": 0})
+    balance = (entity or {}).get("balance", 0)
+    return {"payment": payment, "entity": entity, "balance": balance, "advance_available": max(0.0, -balance)}
+
+
+# ==================== STOCK ALERTS ====================
+
+@router.get("/dashboard/stock-alerts")
+async def stock_alerts(user: dict = Depends(get_current_user)):
+    products = await db.products.find({"$expr": {"$lte": ["$stock", "$min_stock"]}}, {"_id": 0, "id": 1, "name": 1, "sku": 1, "stock": 1, "min_stock": 1, "unit": 1}).sort("stock", 1).to_list(500)
+    out = [p for p in products if p.get("stock", 0) <= 0]
+    low = [p for p in products if p.get("stock", 0) > 0]
+    return {"out_of_stock": out, "low_stock": low, "total": len(products)}

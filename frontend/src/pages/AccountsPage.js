@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import api from "../lib/api";
 import { SETTLEMENT_METHODS, paymentBadgeClass } from "../lib/paymentMethods";
 import { AdvanceDialog } from "../components/AdvanceDialog";
@@ -26,6 +26,7 @@ const AccountsPage = () => {
   const [loading, setLoading] = useState(true);
   const [payTarget, setPayTarget] = useState(null);
   const [advanceTarget, setAdvanceTarget] = useState(null);
+  const navigate = useNavigate();
 
   const handleApplyAdvance = async (entity, type) => {
     try {
@@ -69,7 +70,7 @@ const AccountsPage = () => {
     }
     setSaving(true);
     try {
-      await api.post("/payments", {
+      const r = await api.post("/payments", {
         entity_type: payTarget.type,
         entity_id: payTarget.id,
         amount,
@@ -80,6 +81,7 @@ const AccountsPage = () => {
       toast.success(payTarget.type === "customer" ? "Encaissement enregistré" : "Règlement enregistré");
       setPayTarget(null);
       fetchData();
+      navigate(`/receipt/${r.data.id}`);
     } catch (error) {
       toast.error(error.response?.data?.detail || "Erreur lors de l'enregistrement");
     } finally {
