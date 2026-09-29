@@ -141,7 +141,7 @@ const LoginPage = () => {
 
           <div className="mt-8 pt-6 border-t border-slate-200 text-center">
             <p className="text-xs text-slate-500">
-              Développé par Amdy SECK
+              Ce logiciel est créé par Amdy SECK — Copyright © IBM
             </p>
             <p className="text-xs text-slate-500 font-mono">
               77 571 93 98

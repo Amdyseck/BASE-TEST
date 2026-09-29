@@ -149,11 +149,19 @@ const Layout = () => {
       <ChangePasswordDialog open={pwdOpen} onOpenChange={setPwdOpen} />
 
       {/* Main content */}
-      <main className="main-content">
+      <main className="main-content pb-10">
         <div className="p-6 lg:p-8 grid-pattern min-h-screen">
           <Outlet />
         </div>
       </main>
+
+      <footer className="app-footer no-print" data-testid="app-footer">
+        <span className="font-medium text-slate-200">Ce logiciel est créé par Amdy SECK</span>
+        <span className="mx-2 text-slate-500">|</span>
+        <span>Copyright © IBM</span>
+        <span className="mx-2 text-slate-500">|</span>
+        <a href="tel:+221775719398" className="font-mono hover:text-white">77 571 93 98</a>
+      </footer>
 
       {/* Mobile overlay */}
       {sidebarOpen && (

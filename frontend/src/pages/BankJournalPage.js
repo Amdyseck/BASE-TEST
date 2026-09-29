@@ -335,7 +335,7 @@ const BankJournalPage = () => {
       
       {/* Footer */}
       <div className="text-center text-xs text-slate-400 mt-8">
-        <p>Développé par Amdy SECK - 77 571 93 98</p>
+        <p>Ce logiciel est créé par Amdy SECK — Copyright © IBM — 77 571 93 98</p>
       </div>
     </div>
   );

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import api from "../lib/api";
 import { SETTLEMENT_METHODS, paymentBadgeClass } from "../lib/paymentMethods";
+import { AdvanceDialog } from "./AdvanceDialog";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -10,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { toast } from "sonner";
-import { Search, ArrowDownCircle, ArrowUpCircle, FileText, CheckCircle2, RefreshCw, Barcode, Volume2, VolumeX } from "lucide-react";
+import { Search, ArrowDownCircle, ArrowUpCircle, FileText, CheckCircle2, RefreshCw, Barcode, Volume2, VolumeX, PiggyBank } from "lucide-react";
 
 const formatCurrency = (amount) =>
   new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", minimumFractionDigits: 0 }).format(amount || 0);
@@ -50,6 +51,8 @@ export const UnpaidInvoices = ({ onPaid }) => {
   const [lastUpdate, setLastUpdate] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [quickRef, setQuickRef] = useState("");
+  const [advanceOpen, setAdvanceOpen] = useState(false);
+  const [tiers, setTiers] = useState({ customers: {}, suppliers: {} });
   const [soundOn, setSoundOn] = useState(() => localStorage.getItem("cash_sound") !== "off");
   const knownIds = useRef(null);
   const soundRef = useRef(soundOn);
@@ -74,7 +77,8 @@ export const UnpaidInvoices = ({ onPaid }) => {
   const load = async (silent = false) => {
     if (!silent) setRefreshing(true);
     try {
-      const [s, si] = await Promise.all([api.get("/sales"), api.get("/supplier-invoices")]);
+      const [s, si, c, sp] = await Promise.all([api.get("/sales"), api.get("/supplier-invoices"), api.get("/customers"), api.get("/suppliers")]);
+      setTiers({ customers: Object.fromEntries(c.data.map((x) => [x.id, x])), suppliers: Object.fromEntries(sp.data.map((x) => [x.id, x])) });
       const unpaid = s.data.filter((x) => x.status !== "cancelled" && (x.balance_due || 0) > 0);
       if (knownIds.current) {
         const fresh = unpaid.filter((x) => !knownIds.current.has(x.id));
@@ -111,8 +115,13 @@ export const UnpaidInvoices = ({ onPaid }) => {
     quickInputRef.current?.select();
   };
 
+  const advanceAvailable = (invoice, kind) => {
+    const tier = kind === "customer" ? tiers.customers[invoice.customer_id] : tiers.suppliers[invoice.supplier_id];
+    return Math.max(0, -(tier?.balance || 0));
+  };
+
   const openPay = (invoice, kind) => {
-    setTarget({ ...invoice, kind });
+    setTarget({ ...invoice, kind, advance: advanceAvailable(invoice, kind) });
     setForm({ amount: String(invoice.balance_due), payment_method: "especes" });
   };
 
@@ -212,6 +221,9 @@ export const UnpaidInvoices = ({ onPaid }) => {
           />
         </div>
         <Button type="submit" className="btn-accent h-11 px-6" data-testid="quick-invoice-submit"><ArrowDownCircle className="w-4 h-4 mr-2" /> Encaisser</Button>
+        <Button type="button" variant="outline" onClick={() => setAdvanceOpen(true)} className="h-11 border-teal-400 text-teal-200 bg-transparent hover:bg-teal-900/40 hover:text-white" data-testid="open-advance-btn">
+          <PiggyBank className="w-4 h-4 mr-2" /> Avance
+        </Button>
         <Button type="button" variant="ghost" onClick={() => setSoundOn(!soundOn)} className="h-11 text-slate-300 hover:text-white hover:bg-slate-800" title={soundOn ? "Désactiver le son" : "Activer le son"} data-testid="sound-toggle-btn">
           {soundOn ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
         </Button>
@@ -242,6 +254,8 @@ export const UnpaidInvoices = ({ onPaid }) => {
         {renderTable(filteredSupplier, "supplier")}
       </div>
 
+      <AdvanceDialog open={advanceOpen} onOpenChange={setAdvanceOpen} onSaved={() => { load(true); onPaid?.(); }} />
+
       <Dialog open={!!target} onOpenChange={(o) => !o && setTarget(null)}>
         <DialogContent>
           <DialogHeader>
@@ -254,6 +268,7 @@ export const UnpaidInvoices = ({ onPaid }) => {
               <div className="flex justify-between"><span className="text-slate-500">{target?.kind === "customer" ? "Client" : "Fournisseur"}</span><span className="font-medium">{target?.kind === "customer" ? target?.customer_name || "Client Comptoir" : target?.supplier_name}</span></div>
               <div className="flex justify-between"><span className="text-slate-500">Total</span><span className="font-mono">{formatCurrency(target?.total)}</span></div>
               <div className="flex justify-between"><span className="text-slate-500">Reste à régler</span><span className="font-mono font-bold text-orange-600">{formatCurrency(target?.balance_due)}</span></div>
+              {target?.advance > 0 && <div className="flex justify-between text-teal-700"><span>Avance disponible</span><span className="font-mono font-medium" data-testid="unpaid-advance-available">{formatCurrency(target.advance)}</span></div>}
             </div>
             <div className="space-y-2">
               <Label className="overline">Montant (XOF)</Label>
@@ -266,6 +281,9 @@ export const UnpaidInvoices = ({ onPaid }) => {
                 <SelectTrigger className="rounded-sm" data-testid="unpaid-method-select"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {SETTLEMENT_METHODS.map((m) => <SelectItem key={m.value} value={m.value}><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${paymentBadgeClass(m.value)}`}>{m.label}</span></SelectItem>)}
+                  {target?.advance > 0 && (
+                    <SelectItem value="avance" data-testid="unpaid-method-avance"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${paymentBadgeClass("avance")}`}>Avance disponible ({formatCurrency(target.advance)})</span></SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>

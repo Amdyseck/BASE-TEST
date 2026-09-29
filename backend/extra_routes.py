@@ -170,11 +170,17 @@ async def account_statement(entity_type: str, entity_id: str, user: dict = Depen
             later += sum(a["amount"] for p in direct_payments for a in p.get("allocations", []) if a.get("id") == s["id"])
             initial = round(s.get("amount_paid", 0) - later, 2)
             if initial > 0:
-                lines.append({"date": _dt(s["created_at"]), "label": "Règlement comptant", "reference": s["invoice_number"], "debit": 0, "credit": initial, "type": "payment", "payment_method": s.get("payment_method")})
+                use = s.get("payment_method") == "avance"
+                lines.append({"date": _dt(s["created_at"]), "label": "Facture réglée par avance" if use else "Règlement comptant", "reference": s["invoice_number"], "debit": 0, "credit": 0 if use else initial, "info_amount": initial if use else None, "type": "payment", "payment_method": s.get("payment_method")})
         for p in sale_payments:
-            lines.append({"date": _dt(p["created_at"]), "label": "Règlement facture", "reference": p.get("entity_name", ""), "debit": 0, "credit": p["amount"], "type": "payment", "payment_method": p.get("payment_method")})
+            use = p.get("payment_method") == "avance"
+            lines.append({"date": _dt(p["created_at"]), "label": "Facture réglée par avance" if use else "Règlement facture", "reference": p.get("entity_name", ""), "debit": 0, "credit": 0 if use else p["amount"], "info_amount": p["amount"] if use else None, "type": "payment", "payment_method": p.get("payment_method")})
         for p in direct_payments:
-            lines.append({"date": _dt(p["created_at"]), "label": "Encaissement client", "reference": p.get("reference", ""), "debit": 0, "credit": p["amount"], "type": "payment", "payment_method": p.get("payment_method")})
+            kind = p.get("kind", "payment")
+            if kind == "advance_use":
+                lines.append({"date": _dt(p["created_at"]), "label": "Imputation d'avance sur factures", "reference": ", ".join(a.get("reference", "") for a in p.get("allocations", [])), "debit": 0, "credit": 0, "info_amount": p["amount"], "type": "payment", "payment_method": "avance"})
+            else:
+                lines.append({"date": _dt(p["created_at"]), "label": "Avance / dépôt client" if kind == "advance" else "Encaissement client", "reference": p.get("reference", ""), "debit": 0, "credit": p["amount"], "type": "payment", "payment_method": p.get("payment_method")})
     elif entity_type == "supplier":
         entity = await db.suppliers.find_one({"id": entity_id}, {"_id": 0})
         if not entity:
@@ -184,7 +190,10 @@ async def account_statement(entity_type: str, entity_id: str, user: dict = Depen
         for inv in invoices:
             lines.append({"date": _dt(inv["created_at"]), "label": f"Facture fournisseur {inv['invoice_number']}", "reference": inv["invoice_number"], "debit": inv["total"], "credit": 0, "type": "invoice", "source_id": inv["id"]})
         for p in payments:
-            lines.append({"date": _dt(p["created_at"]), "label": "Règlement fournisseur", "reference": p.get("reference", ""), "debit": 0, "credit": p["amount"], "type": "payment", "payment_method": p.get("payment_method")})
+            kind = p.get("kind", "payment")
+            use = p.get("payment_method") == "avance"
+            label = "Imputation d'avance sur factures" if kind == "advance_use" else "Facture réglée par avance" if use else "Avance / dépôt fournisseur" if kind == "advance" else "Règlement fournisseur"
+            lines.append({"date": _dt(p["created_at"]), "label": label, "reference": p.get("reference", "") or ", ".join(a.get("reference", "") for a in p.get("allocations", [])), "debit": 0, "credit": 0 if use else p["amount"], "info_amount": p["amount"] if use else None, "type": "payment", "payment_method": p.get("payment_method")})
     else:
         raise HTTPException(status_code=400, detail="Type de tiers invalide")
 

@@ -102,11 +102,11 @@ const StatementPage = () => {
           </div>
           <div className="text-right">
             <p className="overline mb-1">Solde actuel</p>
-            <p className={`text-2xl font-bold font-mono ${totals.balance > 0 ? (isCustomer ? "text-green-700" : "text-red-600") : "text-slate-900"}`} data-testid="statement-balance">
+            <p className={`text-2xl font-bold font-mono ${totals.balance > 0 ? (isCustomer ? "text-green-700" : "text-red-600") : totals.balance < 0 ? "text-teal-700" : "text-slate-900"}`} data-testid="statement-balance">
               {formatCurrency(totals.balance)}
             </p>
             <p className="text-xs text-slate-500">
-              {totals.balance > 0 ? (isCustomer ? "Reste dû par le client" : "Reste dû au fournisseur") : totals.balance < 0 ? "Avoir en faveur du tiers" : "Compte soldé"}
+              {totals.balance > 0 ? (isCustomer ? "Reste dû par le client" : "Reste dû au fournisseur") : totals.balance < 0 ? `Avance disponible : ${formatCurrency(-totals.balance)}` : "Compte soldé"}
             </p>
           </div>
         </div>
@@ -132,7 +132,7 @@ const StatementPage = () => {
                 </td>
                 <td className="font-mono text-xs">{l.reference || "-"}</td>
                 <td className="text-right font-mono">{l.debit ? formatCurrency(l.debit) : ""}</td>
-                <td className="text-right font-mono text-green-700">{l.credit ? formatCurrency(l.credit) : ""}</td>
+                <td className="text-right font-mono text-green-700">{l.credit ? formatCurrency(l.credit) : l.info_amount ? <span className="text-teal-600 italic text-xs">({formatCurrency(l.info_amount)} avance)</span> : ""}</td>
                 <td className="text-right font-mono font-medium">{formatCurrency(l.balance)}</td>
               </tr>
             )) : (
@@ -151,7 +151,7 @@ const StatementPage = () => {
 
         <div className="mt-8 pt-4 border-t border-slate-200 text-center text-xs text-slate-500">
           <p>{settings.name}</p>
-          <p className="mt-1 text-[10px]">Développé par Amdy SECK - 77 571 93 98</p>
+          <p className="mt-1 text-[10px]">Ce logiciel est créé par Amdy SECK — Copyright © IBM — 77 571 93 98</p>
         </div>
       </div>
 

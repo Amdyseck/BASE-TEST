@@ -18,6 +18,13 @@
     @apply ml-64 min-h-screen bg-slate-50;
 }
 
+.app-footer {
+    @apply fixed bottom-0 left-64 right-0 z-30 h-9 flex items-center justify-center bg-slate-900 text-slate-300 text-xs tracking-wide border-t border-slate-700 whitespace-nowrap overflow-hidden px-2;
+}
+.app-footer span, .app-footer a {
+    @apply truncate;
+}
+
 /* Cards */
 .stat-card {
     @apply bg-white border border-slate-200 rounded-sm shadow-sm p-4;
@@ -33,7 +40,7 @@
 
 /* Tables */
 .table-container {
-    @apply bg-white border border-slate-200 rounded-sm overflow-hidden;
+    @apply bg-white border border-slate-200 rounded-sm overflow-hidden overflow-x-auto;
 }
 
 .table-header {
@@ -147,6 +154,9 @@
     
     .main-content {
         @apply ml-0;
+    }
+    .app-footer {
+        @apply left-0;
     }
 }
 

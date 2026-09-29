@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import api from "../lib/api";
 import { SETTLEMENT_METHODS, paymentBadgeClass } from "../lib/paymentMethods";
+import { AdvanceDialog } from "../components/AdvanceDialog";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -11,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { toast } from "sonner";
-import { Users, Truck, Search, FileText, Wallet, ArrowDownCircle, ArrowUpCircle } from "lucide-react";
+import { Users, Truck, Search, FileText, Wallet, ArrowDownCircle, ArrowUpCircle, PiggyBank, Sparkles } from "lucide-react";
 
 const formatCurrency = (amount) =>
   new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", minimumFractionDigits: 0 }).format(amount || 0);
@@ -24,6 +25,17 @@ const AccountsPage = () => {
   const [onlyWithBalance, setOnlyWithBalance] = useState(false);
   const [loading, setLoading] = useState(true);
   const [payTarget, setPayTarget] = useState(null);
+  const [advanceTarget, setAdvanceTarget] = useState(null);
+
+  const handleApplyAdvance = async (entity, type) => {
+    try {
+      const r = await api.post(`/accounts/${type}/${entity.id}/apply-advance`);
+      toast.success(`Avance imputée : ${formatCurrency(r.data.applied)} sur ${r.data.allocations.length} facture(s)`);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Erreur lors de l'imputation");
+    }
+  };
   const [payForm, setPayForm] = useState({ amount: "", payment_method: "especes", reference: "", notes: "" });
   const [saving, setSaving] = useState(false);
 
@@ -126,8 +138,10 @@ const AccountsPage = () => {
                   <TableRow key={e.id} className="table-row" data-testid={`account-row-${e.id}`}>
                     <TableCell className="font-medium text-slate-900">{e.name}</TableCell>
                     <TableCell className="text-slate-500">{e.phone || "-"}</TableCell>
-                    <TableCell className={`text-right font-mono font-medium ${(e.balance || 0) > 0 ? (isCustomer ? "text-green-700" : "text-red-600") : (e.balance || 0) < 0 ? "text-orange-600" : "text-slate-500"}`}>
-                      {formatCurrency(e.balance)}
+                    <TableCell className={`text-right font-mono font-medium ${(e.balance || 0) > 0 ? (isCustomer ? "text-green-700" : "text-red-600") : (e.balance || 0) < 0 ? "text-teal-700" : "text-slate-500"}`}>
+                      {(e.balance || 0) < 0 ? (
+                        <span className="inline-flex items-center gap-1" data-testid={`advance-badge-${e.id}`}><PiggyBank className="w-3.5 h-3.5" /> Avance {formatCurrency(-e.balance)}</span>
+                      ) : formatCurrency(e.balance)}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
@@ -136,6 +150,14 @@ const AccountsPage = () => {
                             <FileText className="w-4 h-4 mr-1" /> Relevé
                           </Button>
                         </Link>
+                        <Button size="sm" variant="outline" className="rounded-sm border-teal-300 text-teal-700 bg-teal-50 hover:bg-teal-100" onClick={() => setAdvanceTarget({ entity: e, type })} data-testid={`advance-btn-${e.id}`}>
+                          <PiggyBank className="w-4 h-4 mr-1" /> Avance
+                        </Button>
+                        {(e.balance || 0) < 0 && (
+                          <Button size="sm" variant="outline" className="rounded-sm" onClick={() => handleApplyAdvance(e, type)} title="Imputer l'avance sur les factures impayées" data-testid={`apply-advance-btn-${e.id}`}>
+                            <Sparkles className="w-4 h-4 mr-1" /> Imputer
+                          </Button>
+                        )}
                         <Button size="sm" className="btn-primary" onClick={() => openPay(e, type)} data-testid={`pay-btn-${e.id}`}>
                           {isCustomer ? <ArrowDownCircle className="w-4 h-4 mr-1" /> : <ArrowUpCircle className="w-4 h-4 mr-1" />}
                           {isCustomer ? "Encaisser" : "Régler"}
@@ -206,6 +228,8 @@ const AccountsPage = () => {
         <TabsContent value="customer" className="mt-4">{renderTable(customers, "customer")}</TabsContent>
         <TabsContent value="supplier" className="mt-4">{renderTable(suppliers, "supplier")}</TabsContent>
       </Tabs>
+
+      <AdvanceDialog open={!!advanceTarget} onOpenChange={(o) => !o && setAdvanceTarget(null)} entity={advanceTarget?.entity} entityType={advanceTarget?.type || "customer"} onSaved={fetchData} />
 
       <Dialog open={!!payTarget} onOpenChange={(open) => !open && setPayTarget(null)}>
         <DialogContent>

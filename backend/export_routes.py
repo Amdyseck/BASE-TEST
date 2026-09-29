@@ -101,11 +101,13 @@ async def daily_report(date: Optional[str] = None, user: dict = Depends(require_
     cancelled = [s for s in sales if s.get("status") == "cancelled"]
     payments = await db.payments.find({"created_at": rng}, {"_id": 0}).to_list(10000)
     sale_payments = [p for p in payments if p.get("entity_type") == "sale"]
-    customer_payments = [p for p in payments if p.get("entity_type") == "customer"]
-    supplier_payments = [p for p in payments if p.get("entity_type") == "supplier"]
+    customer_payments = [p for p in payments if p.get("entity_type") == "customer" and p.get("kind") != "advance_use"]
+    supplier_payments = [p for p in payments if p.get("entity_type") == "supplier" and p.get("kind") != "advance_use"]
 
     by_method = {}
     def add(method, key, amount):
+        if method == "avance":
+            return
         m = by_method.setdefault(method or "especes", {"sales_cash": 0, "invoice_payments": 0, "customer_payments": 0, "supplier_payments": 0, "total_in": 0, "total_out": 0})
         m[key] = round(m[key] + amount, 2)
         if key == "supplier_payments":

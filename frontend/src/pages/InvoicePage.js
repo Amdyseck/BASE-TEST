@@ -191,7 +191,7 @@ const InvoicePage = () => {
       <div className="mt-4 pt-3 border-t border-slate-200 text-center text-xs text-slate-500">
         <p>{settings.footer_note}</p>
         <p className="mt-1">{settings.name}</p>
-        <p className="mt-1 text-[10px]">Développé par Amdy SECK - 77 571 93 98</p>
+        <p className="mt-1 text-[10px]">Ce logiciel est créé par Amdy SECK — Copyright © IBM — 77 571 93 98</p>
       </div>
     </div>
   );
@@ -329,7 +329,7 @@ const InvoicePage = () => {
           <div className="mt-8 pt-6 border-t border-slate-200 text-center text-sm text-slate-500">
             <p>{settings.footer_note}</p>
             <p className="mt-1">{settings.name}{settings.slogan ? ` - ${settings.slogan}` : ""}</p>
-            <p className="mt-2 text-xs">Développé par Amdy SECK - 77 571 93 98</p>
+            <p className="mt-2 text-xs">Ce logiciel est créé par Amdy SECK — Copyright © IBM — 77 571 93 98</p>
           </div>
         </div>
       </div>

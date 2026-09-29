@@ -1,0 +1,50 @@
+{
+  "summary": "Iteration 5: daily report, non_paye payment method, quick-invoice cash encaissement, new-invoice notification/sound-toggle. Backend 8/8 pytest passed. Frontend admin + caissier end-to-end flows verified live (POS non_paye -> invoice with 'Non payé' badge; caissier quick search via tail digits; auto-refresh + toast on new invoice).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Encaissement dialog (UnpaidInvoices)", "issues": ["Radix DialogContent aria-describedby warning (a11y minor, pre-existing)"]}
+    ]
+  },
+  "passed_tests": [
+    "BACKEND GET /api/reports/daily (admin) -> 200, all required keys present (date, sales.{count,total_revenue,total_received,total_credit,total_discount,cancelled_count,list}, by_method, encaissements, cash.{total_in,total_out,net,by_category,sessions,movements_count}, bank.{credit,debit,net,entries}, top_products)",
+    "BACKEND GET /api/reports/daily?date=2026-09-25 -> 200 with date echoed",
+    "BACKEND GET /api/reports/daily as caissier -> 403 (no reports module)",
+    "BACKEND coherence: cash session opened -> POST /api/sales especes fully paid -> sales.count +1, by_method.especes.sales_cash += amount, cash.total_in += amount",
+    "BACKEND GET /api/export/reports/daily.xlsx -> 200 xlsx openable by openpyxl, contains 'VENTES' section",
+    "BACKEND GET /api/export/reports/daily.xlsx as caissier -> 403",
+    "BACKEND POST /api/sales payment_method='non_paye' WITHOUT customer_id -> 400 'Sélectionnez un client...'",
+    "BACKEND POST /api/sales payment_method='non_paye' WITH customer_id (customer_name omitted) -> 200, amount_paid forced to 0, balance_due=total, is_paid=false, customer_name resolved from customer record, customer.balance incremented by total, sale appears in GET /api/sales with balance_due>0",
+    "FRONTEND admin /reports: tab-daily active by default; daily-date-input/generate/today/print/export-excel visible; daily-sales-card/daily-cash-card/daily-bank-card populated with values; daily-method-especes row present; daily-export-excel-btn triggered .xlsx download (rapport_journalier_*.xlsx); date=2026-09-25 -> 8 factures displayed",
+    "FRONTEND admin /pos non_paye: payment-non_paye button present; clicking hides input-amount-paid and shows unpaid-notice; checkout-btn disabled while customer=comptoir; selecting real customer enables checkout-btn; validation -> redirect /invoice/:id with 'Non payé' badge and Reste à payer = total (FAC-20260929-0005 created)",
+    "FRONTEND settlement dialog (Factures à régler): payment method Select only offers Espèces/WAVE/Orange Money/Chèque/Banque — 'Non payé' correctly hidden (SETTLEMENT_METHODS filter works)",
+    "FRONTEND caissier /cash: quick-invoice-input has autofocus on load; sound-toggle-btn flips localStorage.cash_sound between 'on' and 'off' and updates icon; typing '999999'+Enter -> toast 'Aucune facture à régler ne correspond...'; typing tail '5' + Enter matches FAC-20260929-0005 -> unpaid-pay-form dialog opens with correct title; partial payment 500 via unpaid-amount-input + unpaid-pay-submit -> toast success 'Encaissement enregistré', list updates (balance 12500 -> 12000), focus returns to quick-invoice-input",
+    "FRONTEND caissier new-invoice notification: while /cash open, admin API creates non_paye sale FAC-20260929-0006 -> within ~4s the row appears in the list AND toast 'Nouvelle facture à encaisser : FAC-20260929-0006' displays without page reload"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_iter5_features.py",
+    "/app/test_reports/pytest/iter5.xml"
+  ],
+  "action_items": [
+    "OPTIONAL a11y: add DialogDescription to encaissement dialog to silence Radix warning."
+  ],
+  "critical_code_review_comments": [
+    "create_sale: non_paye path resets amount_paid=0 BEFORE customer_name resolution — correct order maintained.",
+    "customer_name resolution triggered only when customer_name missing or equal to 'Client Comptoir' — good.",
+    "reports/daily by_method 'sales_cash' clamps initial payment to min(initial, total) to avoid over-counting when there is monnaie rendue — good.",
+    "reports/daily uses lexicographic string date range ($gte T00:00:00, $lte T23:59:59.999999) — consistent with rest of codebase (created_at stored as isoformat strings).",
+    "UnpaidInvoices.load: on first load knownIds.current is null, so no toast on initial (avoids spurious startup notifications) — good.",
+    "playChime uses shared audioCtx; if browser autoplay policy blocks it, silently caught — acceptable.",
+    "handleQuickSearch: digits.padStart(4,'0') matches on '-0002' suffix; also falls back to endsWith(ref) — robust for barcode / partial input.",
+    "SETTLEMENT_METHODS filters out saleOnly:true — non_paye correctly hidden in settlement Selects. Good."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter5_features.py"],
+  "success_rate": {"backend": "100% (8/8 pytest)", "frontend": "100% (all iter5 flows verified across admin + caissier)"},
+  "test_credentials": "admin@wakeur.sn/admin123, caissier.test@wakeur.sn/test1234 (unchanged)",
+  "seed_data_creation": "Created test sales FAC-20260929-0001..0006 during testing (non_paye credit invoices for SERIGNE MBACKE SECK) + one especes fully-paid sale for coherence test. Customer balance grew accordingly. No test users deleted. Cash session (admin, opened 25 sept.) left OPEN as instructed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend regression: /app/backend/tests/test_iter5_features.py (8 tests). Run with REACT_APP_BACKEND_URL exported. Existing test users caissier.test / vendeur.test / gerant.test / admin still valid. Multiple credit invoices (FAC-20260929-000x) exist for customer SERIGNE MBACKE SECK — useful for future encaissement tests. For quick-invoice tail match, use e.g. '6' to hit FAC-20260929-0006."
+}

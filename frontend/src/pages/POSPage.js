@@ -9,7 +9,7 @@ import { Label } from "../components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { toast } from "sonner";
-import { Search, Plus, Minus, Trash2, Receipt, Barcode, Banknote, Smartphone, CreditCard, Lock, FileText, PackageSearch, Wallet, Ban } from "lucide-react";
+import { Search, Plus, Minus, Trash2, Receipt, Barcode, Banknote, Smartphone, CreditCard, Lock, FileText, PackageSearch, Wallet, Ban, PiggyBank } from "lucide-react";
 
 const formatCurrency = (amount) =>
   new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", minimumFractionDigits: 0 }).format(amount || 0);
@@ -21,6 +21,7 @@ const PAYMENT_METHODS = [
   { value: "cheque", label: "Chèque", icon: CreditCard },
   { value: "banque", label: "Banque", icon: CreditCard },
   { value: "non_paye", label: "Non payé", icon: Ban },
+  { value: "avance", label: "Avance client", icon: PiggyBank },
 ];
 
 const POSPage = () => {
@@ -120,12 +121,16 @@ const POSPage = () => {
     setAmountPaid(0);
   };
 
+  const selectedCustomerObj = customers.find((c) => c.id === selectedCustomer);
+  const advanceAvailable = Math.max(0, -(selectedCustomerObj?.balance || 0));
+  const isAdvance = paymentMethod === "avance";
   const isUnpaid = paymentMethod === "non_paye";
-  const effectiveAmountPaid = isUnpaid ? 0 : amountPaid;
   const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
   const maxDiscount = Math.floor((subtotal * maxDiscountPct) / 100);
   const total = subtotal - discount;
-  const balanceDue = total - effectiveAmountPaid;
+  const effectiveAmountPaid = isUnpaid ? 0 : isAdvance ? Math.min(advanceAvailable, total) : amountPaid;
+  const autoAdvance = !isAdvance && advanceAvailable > 0 && total - effectiveAmountPaid > 0 ? Math.min(advanceAvailable, total - effectiveAmountPaid) : 0;
+  const balanceDue = total - effectiveAmountPaid - autoAdvance;
   const discountTooHigh = discount > maxDiscount + 0.01;
 
   const handleCheckout = async () => {
@@ -167,7 +172,8 @@ const POSPage = () => {
     (p) => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.sku.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const customerName = selectedCustomer === "comptoir" ? "Client Comptoir" : customers.find((c) => c.id === selectedCustomer)?.name;
+  const customerName = selectedCustomer === "comptoir" ? "Client Comptoir" : selectedCustomerObj?.name;
+  const visibleMethods = PAYMENT_METHODS.filter((m) => m.value !== "avance" || advanceAvailable > 0);
 
   if (loading) {
     return <div className="flex items-center justify-center h-64"><div className="spinner"></div></div>;
@@ -202,12 +208,12 @@ const POSPage = () => {
             <CardContent className="pt-4 space-y-4">
               <div>
                 <Label className="overline block mb-1">Client</Label>
-                <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
+                <Select value={selectedCustomer} onValueChange={(v) => { setSelectedCustomer(v); if (paymentMethod === "avance") setPaymentMethod("especes"); }}>
                   <SelectTrigger className="rounded-sm" data-testid="select-customer"><SelectValue placeholder="Client comptoir" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="comptoir">Client comptoir</SelectItem>
                     {customers.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.name} {c.balance > 0 && `(Solde: ${formatCurrency(c.balance)})`}</SelectItem>
+                      <SelectItem key={c.id} value={c.id}>{c.name} {c.balance > 0 ? `(Doit: ${formatCurrency(c.balance)})` : c.balance < 0 ? `(Avance: ${formatCurrency(-c.balance)})` : ""}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -216,7 +222,7 @@ const POSPage = () => {
               <div>
                 <Label className="overline block mb-2">Mode de règlement</Label>
                 <div className="grid grid-cols-2 gap-2">
-                  {PAYMENT_METHODS.map((method) => (
+                  {visibleMethods.map((method) => (
                     <Button
                       key={method.value}
                       variant={paymentMethod === method.value ? "default" : "outline"}
@@ -236,9 +242,15 @@ const POSPage = () => {
                 {discountTooHigh && <p className="text-xs text-red-600 mt-1" data-testid="discount-limit-warning">Plafond : {formatCurrency(maxDiscount)}</p>}
               </div>
 
-              {isUnpaid ? (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-sm text-sm text-red-700" data-testid="unpaid-notice">
-                  Facture à crédit : aucun montant encaissé. Le total sera porté au compte du client{selectedCustomer === "comptoir" ? " — sélectionnez un client." : "."}
+              {advanceAvailable > 0 && (
+                <div className="p-3 bg-teal-50 border border-teal-200 rounded-sm text-sm text-teal-800" data-testid="advance-notice">
+                  <span className="font-medium">Avance disponible : {formatCurrency(advanceAvailable)}</span>
+                  {isAdvance ? <p className="text-xs mt-1">La facture sera réglée avec l'avance ({formatCurrency(effectiveAmountPaid)}).</p> : autoAdvance > 0 ? <p className="text-xs mt-1">{formatCurrency(autoAdvance)} seront imputés automatiquement sur cette facture.</p> : null}
+                </div>
+              )}
+              {isUnpaid || isAdvance ? (
+                <div className={`p-3 rounded-sm text-sm ${isAdvance ? "bg-teal-50 border border-teal-200 text-teal-800" : "bg-red-50 border border-red-200 text-red-700"}`} data-testid={isAdvance ? "advance-pay-notice" : "unpaid-notice"}>
+                  {isAdvance ? "Règlement par avance client : aucun encaissement." : `Facture à crédit : aucun montant encaissé. Le total sera porté au compte du client${selectedCustomer === "comptoir" ? " — sélectionnez un client." : "."}`}
                 </div>
               ) : (
                 <div>
