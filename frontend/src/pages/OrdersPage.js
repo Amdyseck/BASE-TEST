@@ -35,10 +35,12 @@ import {
   TabsTrigger,
 } from "../components/ui/tabs";
 import { toast } from "sonner";
-import { Plus, ClipboardList, Package, Check, X, Truck, FileText, CreditCard, Warehouse, Banknote, Smartphone } from "lucide-react";
+import { Plus, ClipboardList, Package, Check, X, Truck, FileText, CreditCard, Warehouse, Banknote, Smartphone, Printer } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const OrdersPage = () => {
-  const { isAdmin, isVendeur } = useAuth();
+  const { hasModule } = useAuth();
+  const canPurchase = hasModule("purchases");
   const [orders, setOrders] = useState([]);
   const [supplierInvoices, setSupplierInvoices] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -55,6 +57,19 @@ const OrdersPage = () => {
   const [receiveDepotId, setReceiveDepotId] = useState("");
   const [orderItems, setOrderItems] = useState([]);
   const [newItem, setNewItem] = useState({ product_id: "", quantity: 1 });
+  const [orderDate, setOrderDate] = useState(new Date().toISOString().slice(0, 10));
+  const [supplierRef, setSupplierRef] = useState("");
+
+  const updateOrderItem = (productId, changes) => {
+    setOrderItems(orderItems.map((item) => {
+      if (item.product_id !== productId) return item;
+      const next = { ...item, ...changes };
+      next.quantity = Math.max(0.01, next.quantity || 0);
+      next.unit_cost = Math.max(0, next.unit_cost || 0);
+      next.total = Math.round(next.quantity * next.unit_cost * 100) / 100;
+      return next;
+    }));
+  };
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState("especes");
   const [activeTab, setActiveTab] = useState("orders");
@@ -129,20 +144,24 @@ const OrdersPage = () => {
     }
 
     try {
-      await api.post("/orders", {
+      const r = await api.post("/orders", {
         supplier_id: selectedSupplier,
         depot_id: selectedDepot,
         items: orderItems,
         notes: "",
+        order_date: orderDate,
+        supplier_ref: supplierRef,
       });
-      toast.success("Achat créé");
+      toast.success(`Achat ${r.data.order_number} créé`);
       setIsDialogOpen(false);
       setSelectedSupplier("");
       setSelectedDepot("");
       setOrderItems([]);
+      setSupplierRef("");
+      setOrderDate(new Date().toISOString().slice(0, 10));
       fetchData();
     } catch (error) {
-      toast.error("Erreur lors de la création de l'achat");
+      toast.error(error.response?.data?.detail || "Erreur lors de la création de l'achat");
     }
   };
 
@@ -294,7 +313,7 @@ const OrdersPage = () => {
           </h1>
           <p className="text-slate-500 mt-1">Gérez vos achats et factures fournisseurs</p>
         </div>
-        {(isAdmin || isVendeur) && (
+        {canPurchase && (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button className="btn-primary" data-testid="add-order-btn">
@@ -337,6 +356,17 @@ const OrdersPage = () => {
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="overline">Date d'achat</Label>
+                    <Input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} className="rounded-sm" data-testid="input-order-date" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="overline">N° facture / BL fournisseur (optionnel)</Label>
+                    <Input value={supplierRef} onChange={(e) => setSupplierRef(e.target.value)} placeholder="Ex: F-2026-118" className="rounded-sm font-mono" data-testid="input-supplier-ref" />
                   </div>
                 </div>
 
@@ -387,19 +417,21 @@ const OrdersPage = () => {
                       <TableHeader className="bg-slate-50">
                         <TableRow>
                           <TableHead>Produit</TableHead>
-                          <TableHead className="text-right">Qté</TableHead>
-                          <TableHead className="text-right">Coût</TableHead>
-                          <TableHead className="text-right">Total</TableHead>
-                          <TableHead></TableHead>
+                          <TableHead className="text-right w-28">Quantité</TableHead>
+                          <TableHead className="text-right w-36">Prix d'achat</TableHead>
+                          <TableHead className="text-right w-32">Total</TableHead>
+                          <TableHead className="w-10"></TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {orderItems.map((item) => (
                           <TableRow key={item.product_id}>
-                            <TableCell>{item.product_name}</TableCell>
-                            <TableCell className="text-right font-mono">{item.quantity}</TableCell>
-                            <TableCell className="text-right font-mono">
-                              {formatCurrency(item.unit_cost)}
+                            <TableCell className="font-medium">{item.product_name}</TableCell>
+                            <TableCell className="text-right">
+                              <Input type="number" min="0.01" step="1" value={item.quantity} onChange={(e) => updateOrderItem(item.product_id, { quantity: parseFloat(e.target.value) })} className="w-24 h-8 text-right font-mono rounded-sm ml-auto" data-testid={`order-item-qty-${item.product_id}`} />
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Input type="number" min="0" step="1" value={item.unit_cost} onChange={(e) => updateOrderItem(item.product_id, { unit_cost: parseFloat(e.target.value) })} className="w-32 h-8 text-right font-mono rounded-sm ml-auto" data-testid={`order-item-cost-${item.product_id}`} />
                             </TableCell>
                             <TableCell className="text-right font-mono">
                               {formatCurrency(item.total)}
@@ -558,7 +590,12 @@ const OrdersPage = () => {
                         {formatCurrency(order.total)}
                       </TableCell>
                       <TableCell className="text-right">
-                        {order.status === "pending" && (isAdmin || isVendeur) && (
+                        <Link to={`/purchase/${order.id}`} className="inline-block mr-1">
+                          <Button variant="ghost" size="sm" className="text-slate-600" title="Document d'achat" data-testid={`order-doc-${order.id}`}>
+                            <Printer className="w-4 h-4" />
+                          </Button>
+                        </Link>
+                        {order.status === "pending" && canPurchase && (
                           <div className="flex items-center justify-end gap-2">
                             <Button
                               variant="ghost"
@@ -580,7 +617,7 @@ const OrdersPage = () => {
                             </Button>
                           </div>
                         )}
-                        {order.status === "ordered" && (isAdmin || isVendeur) && (
+                        {order.status === "ordered" && canPurchase && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -592,7 +629,7 @@ const OrdersPage = () => {
                             Réceptionner
                           </Button>
                         )}
-                        {order.status === "received" && !order.is_invoiced && (isAdmin || isVendeur) && (
+                        {order.status === "received" && !order.is_invoiced && canPurchase && (
                           <Button
                             variant="ghost"
                             size="sm"

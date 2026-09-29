@@ -184,6 +184,8 @@ class OrderBase(BaseModel):
     payment_method: str = "especes"
     amount_paid: float = 0
     notes: Optional[str] = ""
+    order_date: Optional[str] = None  # YYYY-MM-DD
+    supplier_ref: Optional[str] = ""  # N° facture / BL du fournisseur
 
 class Order(OrderBase):
     model_config = ConfigDict(extra="ignore")
@@ -1404,12 +1406,36 @@ async def create_order(order_data: OrderBase, user: dict = Depends(require_modul
         balance_due=round(balance_due, 2)
     )
     
+    if order_data.order_date:
+        try:
+            d = datetime.strptime(order_data.order_date, "%Y-%m-%d")
+            now = datetime.now(timezone.utc)
+            order.created_at = d.replace(hour=now.hour, minute=now.minute, second=now.second, tzinfo=timezone.utc)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Date d'achat invalide")
+    else:
+        order.order_date = order.created_at.strftime("%Y-%m-%d")
+    
     doc = order.model_dump()
     doc["created_at"] = doc["created_at"].isoformat()
     doc["items"] = [item.model_dump() for item in order_data.items]
     await db.orders.insert_one(doc)
     
     return order
+
+@api_router.get("/orders/{order_id}")
+async def get_order(order_id: str, user: dict = Depends(require_module("purchases"))):
+    order = await db.orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Achat non trouvé")
+    supplier = await db.suppliers.find_one({"id": order["supplier_id"]}, {"_id": 0})
+    ids = [i["product_id"] for i in order.get("items", [])]
+    products = {p["id"]: p for p in await db.products.find({"id": {"$in": ids}}, {"_id": 0, "id": 1, "sku": 1, "unit": 1}).to_list(1000)}
+    for item in order.get("items", []):
+        item["sku"] = products.get(item["product_id"], {}).get("sku", "")
+        item["unit"] = products.get(item["product_id"], {}).get("unit", "")
+    invoice = await db.supplier_invoices.find_one({"order_id": order_id}, {"_id": 0}) if order.get("is_invoiced") else None
+    return {"order": order, "supplier": supplier, "invoice": invoice}
 
 @api_router.get("/orders", response_model=List[Order])
 async def get_orders(user: dict = Depends(get_current_user)):
@@ -1440,14 +1466,17 @@ async def update_order_status(order_id: str, status: str, depot_id: Optional[str
         # Use depot from request or order
         target_depot_id = depot_id or order.get("depot_id", "")
         
-        # Update stock for received orders and assign to depot
+        # Update stock for received orders, assign to depot and refresh purchase price
         for item in order.get("items", []):
             update_query = {"$inc": {"stock": item["quantity"]}}
+            if item.get("unit_cost", 0) > 0:
+                update_query["$set"] = {"cost_price": item["unit_cost"]}
             if target_depot_id:
-                update_query["$set"] = {
+                update_query.setdefault("$set", {})
+                update_query["$set"].update({
                     "depot_id": target_depot_id,
                     "updated_at": datetime.now(timezone.utc).isoformat()
-                }
+                })
             await db.products.update_one(
                 {"id": item["product_id"]},
                 update_query

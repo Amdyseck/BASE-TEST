@@ -22,6 +22,7 @@ import SettingsPage from "./pages/SettingsPage";
 import AuditPage from "./pages/AuditPage";
 import CashTicketPage from "./pages/CashTicketPage";
 import ReceiptPage from "./pages/ReceiptPage";
+import PurchaseDocumentPage from "./pages/PurchaseDocumentPage";
 import { SettingsProvider } from "./contexts/SettingsContext";
 import { ConfirmProvider } from "./contexts/ConfirmContext";
 import Layout from "./components/Layout";
@@ -64,6 +65,11 @@ function App() {
           <Route path="/invoice/:saleId" element={
             <ProtectedRoute>
               <InvoicePage />
+            </ProtectedRoute>
+          } />
+          <Route path="/purchase/:orderId" element={
+            <ProtectedRoute module="purchases">
+              <PurchaseDocumentPage />
             </ProtectedRoute>
           } />
           <Route path="/receipt/:paymentId" element={
