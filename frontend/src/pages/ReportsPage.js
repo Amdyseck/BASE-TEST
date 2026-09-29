@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import api from "../lib/api";
 import { PaymentBadge } from "../lib/paymentMethods";
+import { DailyReport } from "../components/DailyReport";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -34,6 +35,7 @@ import {
   Users,
   Truck,
   Warehouse,
+  CalendarDays,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -181,8 +183,12 @@ const ReportsPage = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="sales" className="space-y-6">
-        <TabsList className="bg-white border border-slate-200 p-1 rounded-sm">
+      <Tabs defaultValue="daily" className="space-y-6">
+        <TabsList className="bg-white border border-slate-200 p-1 rounded-sm no-print">
+          <TabsTrigger value="daily" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white" data-testid="tab-daily">
+            <CalendarDays className="w-4 h-4 mr-2" />
+            Rapport journalier
+          </TabsTrigger>
           <TabsTrigger value="sales" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white" data-testid="tab-sales">
             <TrendingUp className="w-4 h-4 mr-2" />
             Ventes
@@ -196,6 +202,10 @@ const ReportsPage = () => {
             Comptes tiers
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="daily">
+          <DailyReport />
+        </TabsContent>
 
         {/* Sales Report */}
         <TabsContent value="sales" className="space-y-6">

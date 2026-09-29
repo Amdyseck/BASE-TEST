@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import api from "../lib/api";
-import { PAYMENT_METHODS, paymentBadgeClass } from "../lib/paymentMethods";
+import { SETTLEMENT_METHODS, paymentBadgeClass } from "../lib/paymentMethods";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -10,11 +10,34 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { toast } from "sonner";
-import { Search, ArrowDownCircle, ArrowUpCircle, FileText, CheckCircle2, RefreshCw } from "lucide-react";
+import { Search, ArrowDownCircle, ArrowUpCircle, FileText, CheckCircle2, RefreshCw, Barcode, Volume2, VolumeX } from "lucide-react";
 
 const formatCurrency = (amount) =>
   new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", minimumFractionDigits: 0 }).format(amount || 0);
 const formatDate = (d) => new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
+
+let audioCtx = null;
+const playChime = () => {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    const now = audioCtx.currentTime;
+    [[880, 0], [1175, 0.18]].forEach(([freq, offset]) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, now + offset);
+      gain.gain.exponentialRampToValueAtTime(0.25, now + offset + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.35);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(now + offset);
+      osc.stop(now + offset + 0.4);
+    });
+  } catch (e) {
+    /* audio non disponible */
+  }
+};
 
 export const UnpaidInvoices = ({ onPaid }) => {
   const [sales, setSales] = useState([]);
@@ -26,6 +49,16 @@ export const UnpaidInvoices = ({ onPaid }) => {
   const [saving, setSaving] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [quickRef, setQuickRef] = useState("");
+  const [soundOn, setSoundOn] = useState(() => localStorage.getItem("cash_sound") !== "off");
+  const knownIds = useRef(null);
+  const soundRef = useRef(soundOn);
+  const quickInputRef = useRef(null);
+
+  useEffect(() => {
+    soundRef.current = soundOn;
+    localStorage.setItem("cash_sound", soundOn ? "on" : "off");
+  }, [soundOn]);
 
   useEffect(() => {
     load();
@@ -42,7 +75,16 @@ export const UnpaidInvoices = ({ onPaid }) => {
     if (!silent) setRefreshing(true);
     try {
       const [s, si] = await Promise.all([api.get("/sales"), api.get("/supplier-invoices")]);
-      setSales(s.data.filter((x) => x.status !== "cancelled" && (x.balance_due || 0) > 0));
+      const unpaid = s.data.filter((x) => x.status !== "cancelled" && (x.balance_due || 0) > 0);
+      if (knownIds.current) {
+        const fresh = unpaid.filter((x) => !knownIds.current.has(x.id));
+        if (fresh.length > 0) {
+          if (soundRef.current) playChime();
+          toast.info(fresh.length === 1 ? `Nouvelle facture à encaisser : ${fresh[0].invoice_number}` : `${fresh.length} nouvelles factures à encaisser`, { duration: 6000 });
+        }
+      }
+      knownIds.current = new Set(unpaid.map((x) => x.id));
+      setSales(unpaid);
       setSupplierInvoices(si.data.filter((x) => (x.balance_due || 0) > 0));
       setLastUpdate(new Date());
     } catch (error) {
@@ -51,6 +93,22 @@ export const UnpaidInvoices = ({ onPaid }) => {
       setLoading(false);
       setRefreshing(false);
     }
+  };
+
+  const handleQuickSearch = (e) => {
+    e.preventDefault();
+    const ref = quickRef.trim().toLowerCase();
+    if (!ref) return;
+    const digits = ref.replace(/\D/g, "");
+    const matchSale = (x) => x.invoice_number.toLowerCase() === ref || (digits && x.invoice_number.endsWith(`-${digits.padStart(4, "0")}`)) || x.invoice_number.toLowerCase().endsWith(ref);
+    const found = sales.find(matchSale) || supplierInvoices.find(matchSale);
+    if (found) {
+      openPay(found, sales.includes(found) ? "customer" : "supplier");
+      setQuickRef("");
+      return;
+    }
+    toast.error(`Aucune facture à régler ne correspond à « ${quickRef} »`);
+    quickInputRef.current?.select();
   };
 
   const openPay = (invoice, kind) => {
@@ -73,8 +131,9 @@ export const UnpaidInvoices = ({ onPaid }) => {
       await api.post(url);
       toast.success(target.kind === "customer" ? "Encaissement enregistré" : "Règlement fournisseur enregistré");
       setTarget(null);
-      load();
+      load(true);
       onPaid?.();
+      setTimeout(() => quickInputRef.current?.focus(), 200);
     } catch (error) {
       toast.error(error.response?.data?.detail || "Erreur lors du règlement");
     } finally {
@@ -139,10 +198,29 @@ export const UnpaidInvoices = ({ onPaid }) => {
 
   return (
     <div className="space-y-6" data-testid="unpaid-invoices">
+      <form onSubmit={handleQuickSearch} className="flex flex-col md:flex-row md:items-center gap-3 p-3 bg-slate-900 rounded-sm" data-testid="quick-invoice-form">
+        <div className="flex-1 relative">
+          <Barcode className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Input
+            ref={quickInputRef}
+            autoFocus
+            value={quickRef}
+            onChange={(e) => setQuickRef(e.target.value)}
+            placeholder="Encaissement rapide : saisir ou scanner le N° de facture (ex: FAC-20260925-0014 ou 14) puis Entrée"
+            className="pl-11 h-11 rounded-sm font-mono bg-white text-base"
+            data-testid="quick-invoice-input"
+          />
+        </div>
+        <Button type="submit" className="btn-accent h-11 px-6" data-testid="quick-invoice-submit"><ArrowDownCircle className="w-4 h-4 mr-2" /> Encaisser</Button>
+        <Button type="button" variant="ghost" onClick={() => setSoundOn(!soundOn)} className="h-11 text-slate-300 hover:text-white hover:bg-slate-800" title={soundOn ? "Désactiver le son" : "Activer le son"} data-testid="sound-toggle-btn">
+          {soundOn ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+        </Button>
+      </form>
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="relative">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="N° facture, client, fournisseur..." className="pl-9 rounded-sm w-72" data-testid="unpaid-search-input" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Filtrer : N° facture, client, fournisseur..." className="pl-9 rounded-sm w-72" data-testid="unpaid-search-input" />
         </div>
         <div className="flex items-center gap-4 text-sm">
           <button type="button" onClick={() => load()} className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-900" title="Actualiser" data-testid="unpaid-refresh-btn">
@@ -187,7 +265,7 @@ export const UnpaidInvoices = ({ onPaid }) => {
               <Select value={form.payment_method} onValueChange={(v) => setForm({ ...form, payment_method: v })}>
                 <SelectTrigger className="rounded-sm" data-testid="unpaid-method-select"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {PAYMENT_METHODS.map((m) => <SelectItem key={m.value} value={m.value}><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${paymentBadgeClass(m.value)}`}>{m.label}</span></SelectItem>)}
+                  {SETTLEMENT_METHODS.map((m) => <SelectItem key={m.value} value={m.value}><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${paymentBadgeClass(m.value)}`}>{m.label}</span></SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

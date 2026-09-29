@@ -89,7 +89,102 @@ async def overdue_customers(days: int = 7, user: dict = Depends(get_current_user
     return {"days": days, "customers": result, "total_overdue": round(sum(g["overdue_amount"] for g in result), 2)}
 
 
-# ==================== EXCEL EXPORTS ====================
+# ==================== DAILY REPORT ====================
+
+@router.get("/reports/daily")
+async def daily_report(date: Optional[str] = None, user: dict = Depends(require_module("reports"))):
+    day = date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    rng = {"$gte": f"{day}T00:00:00", "$lte": f"{day}T23:59:59.999999"}
+
+    sales = await db.sales.find({"created_at": rng}, {"_id": 0}).to_list(10000)
+    active = [s for s in sales if s.get("status") != "cancelled"]
+    cancelled = [s for s in sales if s.get("status") == "cancelled"]
+    payments = await db.payments.find({"created_at": rng}, {"_id": 0}).to_list(10000)
+    sale_payments = [p for p in payments if p.get("entity_type") == "sale"]
+    customer_payments = [p for p in payments if p.get("entity_type") == "customer"]
+    supplier_payments = [p for p in payments if p.get("entity_type") == "supplier"]
+
+    by_method = {}
+    def add(method, key, amount):
+        m = by_method.setdefault(method or "especes", {"sales_cash": 0, "invoice_payments": 0, "customer_payments": 0, "supplier_payments": 0, "total_in": 0, "total_out": 0})
+        m[key] = round(m[key] + amount, 2)
+        if key == "supplier_payments":
+            m["total_out"] = round(m["total_out"] + amount, 2)
+        else:
+            m["total_in"] = round(m["total_in"] + amount, 2)
+
+    for s in active:
+        later = sum(p["amount"] for p in sale_payments if p.get("entity_id") == s["id"])
+        initial = round(s.get("amount_paid", 0) - later, 2)
+        if initial > 0:
+            add(s.get("payment_method"), "sales_cash", min(initial, s.get("total", initial)))
+    for p in sale_payments:
+        add(p.get("payment_method"), "invoice_payments", p["amount"])
+    for p in customer_payments:
+        add(p.get("payment_method"), "customer_payments", p["amount"])
+    for p in supplier_payments:
+        add(p.get("payment_method"), "supplier_payments", p["amount"])
+
+    movements = await db.cash_movements.find({"created_at": rng}, {"_id": 0}).sort("created_at", 1).to_list(10000)
+    cash_in = round(sum(m["amount"] for m in movements if m["type"] == "in"), 2)
+    cash_out = round(sum(m["amount"] for m in movements if m["type"] == "out"), 2)
+    cash_by_cat = {}
+    for m in movements:
+        k = f"{m['type']}:{m.get('category', 'autre')}"
+        cash_by_cat[k] = round(cash_by_cat.get(k, 0) + m["amount"], 2)
+    sessions = await db.cash_sessions.find({"$or": [{"opened_at": rng}, {"closed_at": rng}]}, {"_id": 0}).sort("opened_at", 1).to_list(100)
+
+    bank = await db.bank_journal.find({"created_at": rng}, {"_id": 0}).sort("created_at", 1).to_list(10000)
+    bank_credit = round(sum(b["amount"] for b in bank if b.get("entry_type") == "credit"), 2)
+    bank_debit = round(sum(b["amount"] for b in bank if b.get("entry_type") == "debit"), 2)
+
+    products_sold = {}
+    for s in active:
+        for it in s.get("items", []):
+            pr = products_sold.setdefault(it["product_id"], {"product_name": it["product_name"], "quantity": 0, "total": 0})
+            pr["quantity"] = round(pr["quantity"] + it["quantity"], 2)
+            pr["total"] = round(pr["total"] + it["total"], 2)
+    top_products = sorted(products_sold.values(), key=lambda x: -x["total"])[:10]
+
+    total_revenue = round(sum(s.get("total", 0) for s in active), 2)
+    total_received_at_sale = round(sum(min(s.get("amount_paid", 0), s.get("total", 0)) for s in active), 2)
+    return {
+        "date": day,
+        "sales": {
+            "count": len(active),
+            "cancelled_count": len(cancelled),
+            "total_revenue": total_revenue,
+            "total_discount": round(sum(s.get("discount", 0) for s in active), 2),
+            "total_credit": round(sum(s.get("balance_due", 0) for s in active), 2),
+            "total_received": total_received_at_sale,
+            "list": [{"invoice_number": s["invoice_number"], "customer_name": s.get("customer_name") or "Client Comptoir", "total": s.get("total", 0), "amount_paid": s.get("amount_paid", 0), "balance_due": s.get("balance_due", 0), "payment_method": s.get("payment_method"), "status": s.get("status"), "cashier_name": s.get("cashier_name", ""), "created_at": s["created_at"]} for s in sorted(sales, key=lambda x: x["created_at"])],
+        },
+        "by_method": by_method,
+        "encaissements": {
+            "invoice_payments": round(sum(p["amount"] for p in sale_payments), 2),
+            "customer_payments": round(sum(p["amount"] for p in customer_payments), 2),
+            "supplier_payments": round(sum(p["amount"] for p in supplier_payments), 2),
+        },
+        "cash": {"total_in": cash_in, "total_out": cash_out, "net": round(cash_in - cash_out, 2), "by_category": cash_by_cat, "sessions": sessions, "movements_count": len(movements)},
+        "bank": {"credit": bank_credit, "debit": bank_debit, "net": round(bank_credit - bank_debit, 2), "entries": bank},
+        "top_products": top_products,
+    }
+
+
+@router.get("/export/reports/daily.xlsx")
+async def export_daily(date: Optional[str] = None, user: dict = Depends(require_module("reports"))):
+    r = await daily_report(date, user)
+    settings = await load_settings()
+    method_labels = {"especes": "Espèces", "wave": "WAVE", "orange_money": "Orange Money", "cheque": "Chèque", "banque": "Banque"}
+    rows = [["VENTES", "", "", ""], ["Nombre de factures", r["sales"]["count"], "", ""], ["Chiffre d'affaires", r["sales"]["total_revenue"], "", ""], ["Remises", r["sales"]["total_discount"], "", ""], ["Encaissé à la vente", r["sales"]["total_received"], "", ""], ["Vendu à crédit", r["sales"]["total_credit"], "", ""], ["Factures annulées", r["sales"]["cancelled_count"], "", ""], []]
+    rows.append(["PAR MODE DE PAIEMENT", "Ventes", "Règlements", "Décaissements"])
+    for m, v in r["by_method"].items():
+        rows.append([method_labels.get(m, m), v["sales_cash"], round(v["invoice_payments"] + v["customer_payments"], 2), v["supplier_payments"]])
+    rows += [[], ["CAISSE", "", "", ""], ["Entrées", r["cash"]["total_in"], "", ""], ["Sorties", r["cash"]["total_out"], "", ""], ["Net caisse", r["cash"]["net"], "", ""], [], ["BANQUE", "", "", ""], ["Crédits", r["bank"]["credit"], "", ""], ["Débits", r["bank"]["debit"], "", ""], ["Net banque", r["bank"]["net"], "", ""], [], ["FACTURES DU JOUR", "Client", "Total", "Reste dû"]]
+    for s in r["sales"]["list"]:
+        rows.append([s["invoice_number"] + (" (annulée)" if s["status"] == "cancelled" else ""), s["customer_name"], s["total"], s["balance_due"]])
+    return build_workbook("Rapport journalier", ["Rubrique", "Valeur", "", ""], rows, settings["name"], f"Journée du {r['date']}")
+
 
 HEADER_FILL = PatternFill("solid", fgColor="0F172A")
 HEADER_FONT = Font(bold=True, color="FFFFFF")

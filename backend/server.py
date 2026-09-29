@@ -946,6 +946,14 @@ async def create_sale(sale_data: SaleBase, user: dict = Depends(require_module("
     perms = effective_permissions(user)
     if not sale_data.items:
         raise HTTPException(status_code=400, detail="La facture ne contient aucun article")
+    if sale_data.payment_method == "non_paye":
+        if not sale_data.customer_id:
+            raise HTTPException(status_code=400, detail="Sélectionnez un client pour une facture non payée")
+        sale_data.amount_paid = 0
+    if sale_data.customer_id and (not sale_data.customer_name or sale_data.customer_name == "Client Comptoir"):
+        cust = await db.customers.find_one({"id": sale_data.customer_id}, {"_id": 0, "name": 1})
+        if cust:
+            sale_data.customer_name = cust["name"]
     subtotal = sum(item.total for item in sale_data.items)
     if sale_data.discount > 0 and subtotal > 0:
         pct = sale_data.discount / subtotal * 100

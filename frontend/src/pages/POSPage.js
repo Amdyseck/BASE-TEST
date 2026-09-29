@@ -9,7 +9,7 @@ import { Label } from "../components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { toast } from "sonner";
-import { Search, Plus, Minus, Trash2, Receipt, Barcode, Banknote, Smartphone, CreditCard, Lock, FileText, PackageSearch, Wallet } from "lucide-react";
+import { Search, Plus, Minus, Trash2, Receipt, Barcode, Banknote, Smartphone, CreditCard, Lock, FileText, PackageSearch, Wallet, Ban } from "lucide-react";
 
 const formatCurrency = (amount) =>
   new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", minimumFractionDigits: 0 }).format(amount || 0);
@@ -20,6 +20,7 @@ const PAYMENT_METHODS = [
   { value: "orange_money", label: "Orange Money", icon: Smartphone },
   { value: "cheque", label: "Chèque", icon: CreditCard },
   { value: "banque", label: "Banque", icon: CreditCard },
+  { value: "non_paye", label: "Non payé", icon: Ban },
 ];
 
 const POSPage = () => {
@@ -119,10 +120,12 @@ const POSPage = () => {
     setAmountPaid(0);
   };
 
+  const isUnpaid = paymentMethod === "non_paye";
+  const effectiveAmountPaid = isUnpaid ? 0 : amountPaid;
   const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
   const maxDiscount = Math.floor((subtotal * maxDiscountPct) / 100);
   const total = subtotal - discount;
-  const balanceDue = total - amountPaid;
+  const balanceDue = total - effectiveAmountPaid;
   const discountTooHigh = discount > maxDiscount + 0.01;
 
   const handleCheckout = async () => {
@@ -134,6 +137,10 @@ const POSPage = () => {
       toast.error(`Remise limitée à ${maxDiscountPct}% (${formatCurrency(maxDiscount)})`);
       return;
     }
+    if (isUnpaid && (!selectedCustomer || selectedCustomer === "comptoir")) {
+      toast.error("Sélectionnez un client pour une facture non payée");
+      return;
+    }
     setProcessing(true);
     try {
       const customerId = selectedCustomer && selectedCustomer !== "comptoir" ? selectedCustomer : null;
@@ -142,7 +149,7 @@ const POSPage = () => {
         customer_id: customerId,
         customer_name: customerId ? customers.find((c) => c.id === selectedCustomer)?.name : "Client Comptoir",
         payment_method: paymentMethod,
-        amount_paid: amountPaid,
+        amount_paid: effectiveAmountPaid,
         discount,
       });
       toast.success(`Facture enregistrée: ${response.data.invoice_number}`);
@@ -229,14 +236,20 @@ const POSPage = () => {
                 {discountTooHigh && <p className="text-xs text-red-600 mt-1" data-testid="discount-limit-warning">Plafond : {formatCurrency(maxDiscount)}</p>}
               </div>
 
-              <div>
-                <Label className="overline block mb-1">Montant reçu (XOF)</Label>
-                <Input type="number" value={amountPaid} onChange={(e) => setAmountPaid(Math.max(0, parseFloat(e.target.value) || 0))} min="0" className="rounded-sm font-mono" data-testid="input-amount-paid" />
-                <Button variant="ghost" size="sm" onClick={() => setAmountPaid(total)} className="mt-1 text-xs text-green-600" data-testid="exact-amount-btn">Montant exact</Button>
-              </div>
+              {isUnpaid ? (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-sm text-sm text-red-700" data-testid="unpaid-notice">
+                  Facture à crédit : aucun montant encaissé. Le total sera porté au compte du client{selectedCustomer === "comptoir" ? " — sélectionnez un client." : "."}
+                </div>
+              ) : (
+                <div>
+                  <Label className="overline block mb-1">Montant reçu (XOF)</Label>
+                  <Input type="number" value={amountPaid} onChange={(e) => setAmountPaid(Math.max(0, parseFloat(e.target.value) || 0))} min="0" className="rounded-sm font-mono" data-testid="input-amount-paid" />
+                  <Button variant="ghost" size="sm" onClick={() => setAmountPaid(total)} className="mt-1 text-xs text-green-600" data-testid="exact-amount-btn">Montant exact</Button>
+                </div>
+              )}
 
               <div className="border-t border-slate-200 pt-3 space-y-1 text-sm">
-                <div className="flex justify-between"><span className="text-slate-500">Montant reçu</span><span className="font-mono">{formatCurrency(amountPaid)}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Montant reçu</span><span className="font-mono">{formatCurrency(effectiveAmountPaid)}</span></div>
                 {balanceDue > 0 ? (
                   <div className="flex justify-between text-orange-600"><span>Reste à payer</span><span className="font-mono" data-testid="balance-due">{formatCurrency(balanceDue)}</span></div>
                 ) : balanceDue < 0 ? (
@@ -251,7 +264,7 @@ const POSPage = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <Button variant="outline" onClick={clearCart} className="rounded-sm" data-testid="clear-cart-btn">Vider</Button>
-                <Button onClick={handleCheckout} disabled={cart.length === 0 || processing || discountTooHigh} className="btn-accent" data-testid="checkout-btn">
+                <Button onClick={handleCheckout} disabled={cart.length === 0 || processing || discountTooHigh || (isUnpaid && selectedCustomer === "comptoir")} className="btn-accent" data-testid="checkout-btn">
                   {processing ? <div className="spinner w-4 h-4" /> : <><Receipt className="w-4 h-4 mr-2" /> Valider</>}
                 </Button>
               </div>
