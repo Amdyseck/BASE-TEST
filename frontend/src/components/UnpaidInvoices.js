@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { toast } from "sonner";
-import { Search, ArrowDownCircle, ArrowUpCircle, FileText, CheckCircle2 } from "lucide-react";
+import { Search, ArrowDownCircle, ArrowUpCircle, FileText, CheckCircle2, RefreshCw } from "lucide-react";
 
 const formatCurrency = (amount) =>
   new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", minimumFractionDigits: 0 }).format(amount || 0);
@@ -24,20 +24,32 @@ export const UnpaidInvoices = ({ onPaid }) => {
   const [target, setTarget] = useState(null);
   const [form, setForm] = useState({ amount: "", payment_method: "especes" });
   const [saving, setSaving] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     load();
+    const interval = setInterval(() => load(true), 10000);
+    const onFocus = () => load(true);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
   }, []);
 
-  const load = async () => {
+  const load = async (silent = false) => {
+    if (!silent) setRefreshing(true);
     try {
       const [s, si] = await Promise.all([api.get("/sales"), api.get("/supplier-invoices")]);
       setSales(s.data.filter((x) => x.status !== "cancelled" && (x.balance_due || 0) > 0));
       setSupplierInvoices(si.data.filter((x) => (x.balance_due || 0) > 0));
+      setLastUpdate(new Date());
     } catch (error) {
-      toast.error("Erreur lors du chargement des factures");
+      if (!silent) toast.error("Erreur lors du chargement des factures");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -132,7 +144,11 @@ export const UnpaidInvoices = ({ onPaid }) => {
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="N° facture, client, fournisseur..." className="pl-9 rounded-sm w-72" data-testid="unpaid-search-input" />
         </div>
-        <div className="flex gap-4 text-sm">
+        <div className="flex items-center gap-4 text-sm">
+          <button type="button" onClick={() => load()} className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-900" title="Actualiser" data-testid="unpaid-refresh-btn">
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
+            {lastUpdate ? `Actualisé à ${lastUpdate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}` : "Actualisation auto (10 s)"}
+          </button>
           <span className="text-slate-500">À encaisser : <span className="font-mono font-bold text-orange-600" data-testid="unpaid-customers-total">{formatCurrency(totalCustomers)}</span> ({filteredSales.length})</span>
           <span className="text-slate-500">À décaisser : <span className="font-mono font-bold text-red-600" data-testid="unpaid-suppliers-total">{formatCurrency(totalSuppliers)}</span> ({filteredSupplier.length})</span>
         </div>

@@ -52,9 +52,16 @@ const CashPage = () => {
 
   useEffect(() => {
     fetchAll();
+    const interval = setInterval(() => fetchAll(true), 10000);
+    const onFocus = () => fetchAll(true);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
   }, []);
 
-  const fetchAll = async () => {
+  const fetchAll = async (silent = false) => {
     try {
       const [cur, mov, hist] = await Promise.all([
         api.get("/cash/session/current"),
@@ -67,7 +74,7 @@ const CashPage = () => {
       setMovSummary(mov.data.summary);
       setHistory(hist.data);
     } catch (error) {
-      toast.error("Erreur lors du chargement de la caisse");
+      if (!silent) toast.error("Erreur lors du chargement de la caisse");
     } finally {
       setLoading(false);
     }

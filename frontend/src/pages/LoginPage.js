@@ -25,9 +25,9 @@ const LoginPage = () => {
     setLoading(true);
 
     try {
-      await login(formData.email, formData.password);
+      const logged = await login(formData.email, formData.password);
       toast.success("Connexion réussie");
-      navigate("/dashboard");
+      navigate(logged?.role === "caissier" ? "/cash" : "/dashboard");
     } catch (error) {
       toast.error(error.response?.data?.detail || "Une erreur est survenue");
     } finally {
