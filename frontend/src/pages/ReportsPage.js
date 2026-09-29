@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import api from "../lib/api";
 import { PaymentBadge } from "../lib/paymentMethods";
 import { DailyReport } from "../components/DailyReport";
+import { MarginReport } from "../components/MarginReport";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -36,6 +37,7 @@ import {
   Truck,
   Warehouse,
   CalendarDays,
+  Percent,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -189,6 +191,10 @@ const ReportsPage = () => {
             <CalendarDays className="w-4 h-4 mr-2" />
             Rapport journalier
           </TabsTrigger>
+          <TabsTrigger value="margin" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white" data-testid="tab-margin">
+            <Percent className="w-4 h-4 mr-2" />
+            Marges
+          </TabsTrigger>
           <TabsTrigger value="sales" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white" data-testid="tab-sales">
             <TrendingUp className="w-4 h-4 mr-2" />
             Ventes
@@ -205,6 +211,10 @@ const ReportsPage = () => {
 
         <TabsContent value="daily">
           <DailyReport />
+        </TabsContent>
+
+        <TabsContent value="margin">
+          <MarginReport />
         </TabsContent>
 
         {/* Sales Report */}

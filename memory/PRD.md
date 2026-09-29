@@ -37,6 +37,8 @@ Contrainte : ne pas traduire WAVE, Orange Money, etc. Langue : français.
 
 - 2026-06 : Achats : date d'achat choisie et N° facture/BL fournisseur à la création, quantité et prix d'achat modifiables par ligne (le prix d'achat met à jour le coût produit à la réception), document d'achat imprimable A4 en colonnes (Bon de commande / Bon de réception / Facture d'achat) via `/purchase/:orderId`.
 
+- 2026-06 : Inventaire physique (`/inventory`, module Produits) : comptage par dépôt, écarts en quantité et valeur, pré-remplissage, ajustement du stock en un clic (confirmation), historique des inventaires (collection `inventories`, tracé dans l'audit) ; Rapport « Marges » par produit sur période (CA, coût, marge, marge %, remises, marge nette) + Excel/PDF.
+
 ## Backlog
 - P2 : découper `server.py` en routers modulaires
 - P2 : tests frontend automatisés

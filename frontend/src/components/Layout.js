@@ -24,6 +24,7 @@ import {
   UserCog,
   History,
   KeyRound,
+  ClipboardCheck,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import {
@@ -51,6 +52,7 @@ const Layout = () => {
     { to: "/pos", icon: ShoppingCart, label: "Facturation", module: "pos" },
     { to: "/cash", icon: Banknote, label: "Gestion caisse", module: "cash" },
     { to: "/products", icon: Package, label: "Produits", module: "products" },
+    { to: "/inventory", icon: ClipboardCheck, label: "Inventaire", module: "products" },
     { to: "/categories", icon: FolderOpen, label: "Familles", module: "categories" },
     { to: "/sales", icon: Receipt, label: "Ventes", module: "sales" },
     { to: "/customers", icon: Users, label: "Clients", module: "customers" },

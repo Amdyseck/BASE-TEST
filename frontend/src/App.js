@@ -23,6 +23,7 @@ import AuditPage from "./pages/AuditPage";
 import CashTicketPage from "./pages/CashTicketPage";
 import ReceiptPage from "./pages/ReceiptPage";
 import PurchaseDocumentPage from "./pages/PurchaseDocumentPage";
+import InventoryPage from "./pages/InventoryPage";
 import { SettingsProvider } from "./contexts/SettingsContext";
 import { ConfirmProvider } from "./contexts/ConfirmContext";
 import Layout from "./components/Layout";
@@ -95,6 +96,7 @@ function App() {
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="products" element={<ProtectedRoute module="products"><ProductsPage /></ProtectedRoute>} />
+            <Route path="inventory" element={<ProtectedRoute module="products"><InventoryPage /></ProtectedRoute>} />
             <Route path="categories" element={<ProtectedRoute module="categories"><CategoriesPage /></ProtectedRoute>} />
             <Route path="customers" element={<ProtectedRoute module="customers"><CustomersPage /></ProtectedRoute>} />
             <Route path="suppliers" element={<ProtectedRoute module="suppliers"><SuppliersPage /></ProtectedRoute>} />

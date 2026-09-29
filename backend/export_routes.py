@@ -1,4 +1,5 @@
 import io
+import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -332,3 +333,121 @@ async def export_sales(start_date: Optional[str] = None, end_date: Optional[str]
     rows.append(["TOTAUX", f"{len(active)} factures", "", "", "", "", None, round(sum(s.get("discount", 0) for s in active), 2), round(sum(s.get("total", 0) for s in active), 2), round(sum(s.get("amount_paid", 0) for s in active), 2), round(sum(s.get("balance_due", 0) for s in active), 2)])
     subtitle = " ".join(filter(None, [f"du {start_date}" if start_date else "", f"au {end_date}" if end_date else "", "(non payées)" if unpaid_only else ""])) or "Toutes les ventes"
     return build_workbook("Ventes", ["Date", "N° facture", "Client", "Caissier", "Mode", "Statut", "Sous-total", "Remise", "Total", "Payé", "Reste dû"], rows, settings["name"], subtitle)
+
+
+# ==================== MARGIN REPORT ====================
+
+async def compute_margin(start_date: Optional[str], end_date: Optional[str]):
+    query = {"status": {"$ne": "cancelled"}}
+    if start_date or end_date:
+        query["created_at"] = {}
+        if start_date:
+            query["created_at"]["$gte"] = f"{start_date}T00:00:00"
+        if end_date:
+            query["created_at"]["$lte"] = f"{end_date}T23:59:59.999999"
+    sales = await db.sales.find(query, {"_id": 0, "items": 1, "discount": 1, "subtotal": 1, "total": 1}).to_list(50000)
+    products = {p["id"]: p for p in await db.products.find({}, {"_id": 0, "id": 1, "name": 1, "sku": 1, "cost_price": 1, "category_name": 1, "unit": 1}).to_list(10000)}
+    agg = {}
+    total_discount = 0
+    for s in sales:
+        total_discount += s.get("discount", 0) or 0
+        for it in s.get("items", []):
+            p = products.get(it["product_id"], {})
+            cost_unit = it.get("unit_cost") if it.get("unit_cost") is not None else p.get("cost_price", 0) or 0
+            a = agg.setdefault(it["product_id"], {"product_id": it["product_id"], "product_name": it.get("product_name") or p.get("name", ""), "sku": p.get("sku", ""), "unit": p.get("unit", ""), "quantity": 0, "revenue": 0, "cost": 0, "cost_price": cost_unit})
+            a["quantity"] = round(a["quantity"] + it["quantity"], 2)
+            a["revenue"] = round(a["revenue"] + it["total"], 2)
+            a["cost"] = round(a["cost"] + it["quantity"] * cost_unit, 2)
+    rows = []
+    for a in agg.values():
+        a["margin"] = round(a["revenue"] - a["cost"], 2)
+        a["margin_rate"] = round(a["margin"] / a["revenue"] * 100, 1) if a["revenue"] else 0
+        a["avg_price"] = round(a["revenue"] / a["quantity"], 2) if a["quantity"] else 0
+        rows.append(a)
+    rows.sort(key=lambda r: -r["margin"])
+    revenue = round(sum(r["revenue"] for r in rows), 2)
+    cost = round(sum(r["cost"] for r in rows), 2)
+    margin = round(revenue - cost, 2)
+    return {"start_date": start_date, "end_date": end_date, "sales_count": len(sales), "products": rows,
+            "totals": {"revenue": revenue, "cost": cost, "margin": margin, "margin_rate": round(margin / revenue * 100, 1) if revenue else 0, "discount": round(total_discount, 2), "net_margin": round(margin - total_discount, 2)}}
+
+
+@router.get("/reports/margin")
+async def margin_report(start_date: Optional[str] = None, end_date: Optional[str] = None, user: dict = Depends(require_module("reports"))):
+    return await compute_margin(start_date, end_date)
+
+
+@router.get("/export/reports/margin.xlsx")
+async def export_margin(start_date: Optional[str] = None, end_date: Optional[str] = None, user: dict = Depends(require_module("reports"))):
+    r = await compute_margin(start_date, end_date)
+    settings = await load_settings()
+    rows = [[p["product_name"], p["sku"], p["quantity"], p["avg_price"], p["cost_price"], p["revenue"], p["cost"], p["margin"], p["margin_rate"]] for p in r["products"]]
+    t = r["totals"]
+    rows.append(["TOTAL", "", "", "", "", t["revenue"], t["cost"], t["margin"], t["margin_rate"]])
+    rows.append(["Remises accordées", "", "", "", "", "", "", -t["discount"], ""])
+    rows.append(["MARGE NETTE", "", "", "", "", "", "", t["net_margin"], ""])
+    subtitle = " ".join(filter(None, [f"du {start_date}" if start_date else "", f"au {end_date}" if end_date else ""])) or "Toute la période"
+    return build_workbook("Marges par produit", ["Produit", "Référence", "Qté vendue", "PV moyen", "Prix d'achat", "Chiffre d'affaires", "Coût", "Marge", "Marge %"], rows, settings["name"], subtitle)
+
+
+# ==================== PHYSICAL INVENTORY ====================
+
+class InventoryLine(BaseModel):
+    product_id: str
+    counted: float
+
+
+class InventoryAdjust(BaseModel):
+    depot_id: Optional[str] = None
+    notes: Optional[str] = ""
+    items: list[InventoryLine]
+
+
+@router.get("/inventory/products")
+async def inventory_products(depot_id: Optional[str] = None, user: dict = Depends(require_module("products"))):
+    query = {}
+    if depot_id and depot_id != "all":
+        query["depot_id"] = depot_id if depot_id != "none" else {"$in": [None, ""]}
+    products = await db.products.find(query, {"_id": 0, "id": 1, "name": 1, "sku": 1, "stock": 1, "min_stock": 1, "unit": 1, "cost_price": 1, "price": 1, "depot_id": 1, "category_name": 1}).sort("name", 1).to_list(10000)
+    return products
+
+
+@router.post("/inventory/adjust")
+async def inventory_adjust(data: InventoryAdjust, user: dict = Depends(require_module("products"))):
+    if not data.items:
+        raise HTTPException(status_code=400, detail="Aucune ligne comptée")
+    ids = [i.product_id for i in data.items]
+    products = {p["id"]: p for p in await db.products.find({"id": {"$in": ids}}, {"_id": 0}).to_list(10000)}
+    lines = []
+    for line in data.items:
+        p = products.get(line.product_id)
+        if not p:
+            continue
+        before = p.get("stock", 0)
+        diff = round(line.counted - before, 2)
+        if diff == 0:
+            continue
+        await db.products.update_one({"id": p["id"]}, {"$set": {"stock": line.counted, "updated_at": datetime.now(timezone.utc).isoformat()}})
+        lines.append({"product_id": p["id"], "product_name": p["name"], "sku": p.get("sku", ""), "unit": p.get("unit", ""), "before": before, "counted": line.counted, "difference": diff, "cost_price": p.get("cost_price", 0), "value_difference": round(diff * (p.get("cost_price", 0) or 0), 2)})
+    depot = await db.depots.find_one({"id": data.depot_id}, {"_id": 0, "name": 1}) if data.depot_id and data.depot_id not in ("all", "none") else None
+    doc = {
+        "id": str(uuid.uuid4()),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": user["name"],
+        "depot_id": data.depot_id,
+        "depot_name": depot["name"] if depot else ("Sans dépôt" if data.depot_id == "none" else "Tous les dépôts"),
+        "notes": data.notes or "",
+        "lines": lines,
+        "counted_count": len(data.items),
+        "adjusted_count": len(lines),
+        "total_value_difference": round(sum(l["value_difference"] for l in lines), 2),
+    }
+    await db.inventories.insert_one(doc)
+    doc.pop("_id", None)
+    await log_audit(user, "update", "products", "inventory", doc["id"], f"Inventaire {doc['depot_name']} ({len(lines)} ajustements)", after={"adjusted": len(lines), "value_difference": doc["total_value_difference"]})
+    return doc
+
+
+@router.get("/inventory/history")
+async def inventory_history(user: dict = Depends(require_module("products"))):
+    return await db.inventories.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
