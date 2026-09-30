@@ -6,7 +6,7 @@ import { useSettings } from "../contexts/SettingsContext";
 import { PaymentBadge } from "../lib/paymentMethods";
 import { Button } from "../components/ui/button";
 import { toast } from "sonner";
-import { Printer, ArrowLeft, FileSpreadsheet } from "lucide-react";
+import { Printer, ArrowLeft, FileSpreadsheet, BookOpen } from "lucide-react";
 
 const formatCurrency = (amount) =>
   new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", minimumFractionDigits: 0 }).format(amount || 0);
@@ -62,6 +62,9 @@ const StatementPage = () => {
           <Button variant="outline" className="rounded-sm"><ArrowLeft className="w-4 h-4 mr-2" /> Retour</Button>
         </Link>
         <div className="flex gap-2">
+          <Link to={`/ledger/${type}/${id}`}>
+            <Button variant="outline" className="rounded-sm text-blue-700" data-testid="statement-ledger-btn"><BookOpen className="w-4 h-4 mr-2" /> Grand livre</Button>
+          </Link>
           <Button variant="outline" className="rounded-sm" onClick={() => downloadFile(`/export/accounts/${type}/${id}/statement.xlsx`, "releve.xlsx").catch(() => toast.error("Erreur lors de l'export"))} data-testid="export-statement-excel-btn">
             <FileSpreadsheet className="w-4 h-4 mr-2" /> Excel
           </Button>

@@ -25,6 +25,7 @@ import ReceiptPage from "./pages/ReceiptPage";
 import PurchaseDocumentPage from "./pages/PurchaseDocumentPage";
 import InventoryPage from "./pages/InventoryPage";
 import SupplierInvoicePage from "./pages/SupplierInvoicePage";
+import AccountLedgerPage from "./pages/AccountLedgerPage";
 import { SettingsProvider } from "./contexts/SettingsContext";
 import { ConfirmProvider } from "./contexts/ConfirmContext";
 import Layout from "./components/Layout";
@@ -87,6 +88,11 @@ function App() {
           <Route path="/cash/ticket/:sessionId" element={
             <ProtectedRoute module="cash">
               <CashTicketPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/ledger/:type/:id" element={
+            <ProtectedRoute>
+              <AccountLedgerPage />
             </ProtectedRoute>
           } />
           <Route path="/accounts/:type/:id" element={

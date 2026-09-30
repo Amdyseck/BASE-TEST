@@ -5,7 +5,8 @@ import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { toast } from "sonner";
-import { DatabaseBackup, Download, Play, Clock } from "lucide-react";
+import { DatabaseBackup, Download, Play, Clock, RotateCcw } from "lucide-react";
+import { useConfirm } from "../contexts/ConfirmContext";
 
 const formatSize = (b) => (b > 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} Mo` : `${Math.max(1, Math.round(b / 1024))} Ko`);
 const formatDate = (d) => new Date(d).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -13,6 +14,26 @@ const formatDate = (d) => new Date(d).toLocaleString("fr-FR", { day: "2-digit", 
 export const BackupsCard = () => {
   const [data, setData] = useState({ backups: [], schedule: "" });
   const [running, setRunning] = useState(false);
+  const [restoring, setRestoring] = useState(null);
+  const confirm = useConfirm();
+
+  const restore = async (b) => {
+    const ok = await confirm({
+      title: "Restaurer la base de données ?",
+      description: `Toutes les données actuelles seront remplacées par la sauvegarde du ${formatDate(b.created_at)} (${b.file}). Une sauvegarde de sécurité de l'état actuel sera créée automatiquement avant la restauration. Cette action est irréversible.`,
+      confirmLabel: "Oui, restaurer",
+    });
+    if (!ok) return;
+    setRestoring(b.file);
+    try {
+      const r = await api.post(`/backups/${b.file}/restore`);
+      toast.success(`Base restaurée (${r.data.documents} enregistrements). Rechargement...`);
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Erreur lors de la restauration");
+      setRestoring(null);
+    }
+  };
 
   const load = () => api.get("/backups").then((r) => setData(r.data)).catch(() => toast.error("Erreur lors du chargement des sauvegardes"));
 
@@ -50,7 +71,7 @@ export const BackupsCard = () => {
                 <TableHead>Déclenchement</TableHead>
                 <TableHead className="text-right">Enregistrements</TableHead>
                 <TableHead className="text-right">Taille</TableHead>
-                <TableHead className="text-right">Télécharger</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -62,8 +83,11 @@ export const BackupsCard = () => {
                   <TableCell className="text-right">{b.documents ?? "-"}</TableCell>
                   <TableCell className="text-right">{formatSize(b.size)}</TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" onClick={() => downloadFile(`/backups/${b.file}`, b.file).catch(() => toast.error("Erreur lors du téléchargement"))} data-testid={`download-backup-${b.file}`}>
+                    <Button variant="ghost" size="sm" title="Télécharger" onClick={() => downloadFile(`/backups/${b.file}`, b.file).catch(() => toast.error("Erreur lors du téléchargement"))} data-testid={`download-backup-${b.file}`}>
                       <Download className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="text-orange-600" title="Restaurer" disabled={!!restoring} onClick={() => restore(b)} data-testid={`restore-backup-${b.file}`}>
+                      <RotateCcw className={`w-4 h-4 mr-1 ${restoring === b.file ? "animate-spin" : ""}`} /> Restaurer
                     </Button>
                   </TableCell>
                 </TableRow>

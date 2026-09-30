@@ -14,17 +14,18 @@ const formatCurrency = (amount) =>
 const formatDate = (d) => new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
 const toISO = (d) => d.toISOString().slice(0, 10);
 
-export const LedgerReport = () => {
+export const LedgerReport = ({ entityType: fixedType, entityId, entityName }) => {
   const { settings, logoUrl } = useSettings();
   const now = new Date();
   const [startDate, setStartDate] = useState(toISO(new Date(now.getFullYear(), now.getMonth(), 1)));
   const [endDate, setEndDate] = useState(toISO(now));
-  const [entityType, setEntityType] = useState("all");
+  const [entityType, setEntityType] = useState(fixedType || "all");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const params = () => {
     const p = new URLSearchParams({ entity_type: entityType });
+    if (entityId) p.append("entity_id", entityId);
     if (startDate) p.append("start", startDate);
     if (endDate) p.append("end", endDate);
     return p.toString();
@@ -48,7 +49,7 @@ export const LedgerReport = () => {
   }, []);
 
   const exportExcel = () =>
-    downloadFile(`/export/reports/ledger.xlsx?${params()}`, "grand_livre_tiers.xlsx").catch(() => toast.error("Erreur lors de l'export"));
+    downloadFile(`/export/reports/ledger.xlsx?${params()}`, entityId ? "grand_livre_compte.xlsx" : "grand_livre_tiers.xlsx").catch(() => toast.error("Erreur lors de l'export"));
 
   const t = data?.totals;
 
@@ -60,14 +61,16 @@ export const LedgerReport = () => {
           <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="rounded-sm w-40" data-testid="ledger-start-date" />
           <span className="text-slate-400">→</span>
           <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="rounded-sm w-40" data-testid="ledger-end-date" />
-          <Select value={entityType} onValueChange={setEntityType}>
-            <SelectTrigger className="rounded-sm w-44" data-testid="ledger-type-select"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Clients + Fournisseurs</SelectItem>
-              <SelectItem value="customer">Clients</SelectItem>
-              <SelectItem value="supplier">Fournisseurs</SelectItem>
-            </SelectContent>
-          </Select>
+          {!entityId && (
+            <Select value={entityType} onValueChange={setEntityType}>
+              <SelectTrigger className="rounded-sm w-44" data-testid="ledger-type-select"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Clients + Fournisseurs</SelectItem>
+                <SelectItem value="customer">Clients</SelectItem>
+                <SelectItem value="supplier">Fournisseurs</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
           <Button onClick={load} className="btn-primary" disabled={loading} data-testid="ledger-generate-btn"><RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} /> Afficher</Button>
         </div>
         {data && (
@@ -89,9 +92,10 @@ export const LedgerReport = () => {
               </div>
             </div>
             <div className="text-right">
-              <p className="text-xl font-bold font-[Chivo] text-slate-900 flex items-center justify-end gap-2"><BookOpen className="w-5 h-5" /> GRAND LIVRE DES TIERS</p>
+              <p className="text-xl font-bold font-[Chivo] text-slate-900 flex items-center justify-end gap-2"><BookOpen className="w-5 h-5" /> {entityId ? `GRAND LIVRE ${entityType === "customer" ? "CLIENT" : "FOURNISSEUR"}` : "GRAND LIVRE DES TIERS"}</p>
+              {entityId && <p className="text-base font-semibold text-slate-800" data-testid="ledger-entity-name">{entityName || data.accounts[0]?.name}</p>}
               <p className="text-sm text-slate-600">Période du {formatDate(startDate)} au {formatDate(endDate)}</p>
-              <p className="text-xs text-slate-500">{entityType === "all" ? "Clients et fournisseurs" : entityType === "customer" ? "Clients" : "Fournisseurs"} — {data.accounts.length} compte(s)</p>
+              {!entityId && <p className="text-xs text-slate-500">{entityType === "all" ? "Clients et fournisseurs" : entityType === "customer" ? "Clients" : "Fournisseurs"} — {data.accounts.length} compte(s)</p>}
             </div>
           </div>
 
@@ -143,7 +147,7 @@ export const LedgerReport = () => {
             </div>
           ))}
 
-          {t && data.accounts.length > 0 && (
+          {t && !entityId && data.accounts.length > 0 && (
             <Card className="bg-slate-900 text-white rounded-sm mt-6" data-testid="ledger-totals">
               <CardContent className="pt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div><p className="text-slate-400 text-xs uppercase tracking-widest">Reports</p><p className="font-mono font-bold">{formatCurrency(t.opening)}</p></div>

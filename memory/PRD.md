@@ -41,6 +41,8 @@ Contrainte : ne pas traduire WAVE, Orange Money, etc. Langue : français.
 
 - 2026-06 (lot 6) : Facture client réorganisée (Client / Date / Vendeur en haut, en-tête articles gris clair, volet Règlement en bas) ; menu en groupes dépliants VENTE · ACHAT · CAISSE · RAPPORT · INVENTAIRE · BANQUE · TABLEAU DE BORD (+ Utilisateurs/Historique/Paramètres), « Facturation » remplacée par « Nouvelle vente » ; Rapport journalier supprimé, onglet « Grand livre des tiers » (période, clients/fournisseurs, report d'ouverture, imprimable + Excel, `/api/reports/ledger`) ; sauvegarde automatique quotidienne 21h (Africa/Dakar) via `.emergent/crons.yml` → `POST /api/cron/backup` (secret `WEBHOOK_CRON_SECRET`), fichiers `backend/backups/sauvegarde_*.json.gz` (30 conservés), liste / téléchargement / « Sauvegarder maintenant » dans Paramètres (admin) ; séparateurs de colonnes bleu clair sur tous les tableaux ; numérotation séquentielle `VTE0000001` (ventes) et `ACH000001` (achats) via collection `counters` (anciens numéros FAC-/ACH- conservés) ; facture fournisseur imprimable `/supplier-invoice/:id` (Prix unitaire, Prix total, MONTANT TOTAL, règlements) ; Caisse renommée « CAISSE » (entrées vert, sorties rouge, solde vert).
 
+- 2026-06 (lot 7) : Restauration d'une sauvegarde depuis Paramètres (`POST /api/backups/{file}/restore`, admin, confirmation, sauvegarde de sécurité automatique avant restauration, compteurs VTE/ACH recalculés, tracé dans l'audit) ; bouton « Grand livre » sur la fiche client / fournisseur et sur le relevé de compte → page `/ledger/:type/:id` (période, impression, Excel, `entity_id` sur `/api/reports/ledger`).
+
 ## Backlog
 - P2 : découper `server.py` en routers modulaires
 - P2 : tests frontend automatisés

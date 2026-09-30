@@ -22,7 +22,8 @@ import {
   TableRow,
 } from "../components/ui/table";
 import { toast } from "sonner";
-import { Plus, Search, Edit, Trash2, Users, Phone, Mail } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Users, Phone, Mail, BookOpen } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const CustomersPage = () => {
   const confirm = useConfirm();
@@ -278,6 +279,11 @@ const CustomersPage = () => {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
+                      <Link to={`/ledger/customer/${customer.id}`} title="Grand livre">
+                        <Button variant="ghost" size="sm" className="text-blue-700" data-testid={`ledger-customer-${customer.id}`}>
+                          <BookOpen className="w-4 h-4 mr-1" /> Grand livre
+                        </Button>
+                      </Link>
                       <Button
                         variant="ghost"
                         size="sm"
