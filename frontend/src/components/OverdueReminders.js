@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import api from "../lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
-import { AlertCircle, MessageCircle, MessageSquare, ArrowRight } from "lucide-react";
+import { AlertCircle, MessageCircle, MessageSquare, ArrowRight, Send } from "lucide-react";
+import { BulkWhatsAppDialog } from "./BulkWhatsAppDialog";
 
 const formatCurrency = (amount) =>
   new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", minimumFractionDigits: 0 }).format(amount || 0);
@@ -23,6 +24,7 @@ const buildMessage = (company, c) => {
 
 export const OverdueReminders = ({ companyName }) => {
   const [data, setData] = useState(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   useEffect(() => {
     api.get("/dashboard/overdue?days=7").then((r) => setData(r.data)).catch(() => setData({ customers: [], total_overdue: 0 }));
@@ -38,7 +40,14 @@ export const OverdueReminders = ({ companyName }) => {
             <AlertCircle className="w-4 h-4 text-orange-600" /> Rappels impayés
             <span className="text-xs font-normal text-slate-500">(+ de {data.days} jours)</span>
           </CardTitle>
-          <span className="font-mono font-bold text-orange-600" data-testid="overdue-total">{formatCurrency(data.total_overdue)}</span>
+          <div className="flex items-center gap-3">
+            <span className="font-mono font-bold text-orange-600" data-testid="overdue-total">{formatCurrency(data.total_overdue)}</span>
+            {data.customers.length > 0 && (
+              <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white rounded-sm h-8" onClick={() => setBulkOpen(true)} data-testid="bulk-whatsapp-btn">
+                <Send className="w-4 h-4 mr-1" /> Relancer tous ({data.customers.length})
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="pt-3">
@@ -81,6 +90,7 @@ export const OverdueReminders = ({ companyName }) => {
           </Link>
         )}
       </CardContent>
+      <BulkWhatsAppDialog open={bulkOpen} onOpenChange={setBulkOpen} customers={data.customers} normalizePhone={normalizePhone} buildMessage={buildMessage} companyName={companyName} />
     </Card>
   );
 };

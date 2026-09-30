@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { toast } from "sonner";
-import { Users, Truck, Search, FileText, Wallet, ArrowDownCircle, ArrowUpCircle, PiggyBank, Sparkles } from "lucide-react";
+import { Users, Truck, Search, FileText, Wallet, ArrowDownCircle, ArrowUpCircle, PiggyBank, Sparkles, BookOpen } from "lucide-react";
 
 const formatCurrency = (amount) =>
   new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", minimumFractionDigits: 0 }).format(amount || 0);
@@ -131,6 +131,7 @@ const AccountsPage = () => {
                 <TableHead>Nom</TableHead>
                 <TableHead>Téléphone</TableHead>
                 <TableHead className="text-right">Solde</TableHead>
+                <TableHead className="text-center">Grand livre</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -144,6 +145,13 @@ const AccountsPage = () => {
                       {(e.balance || 0) < 0 ? (
                         <span className="inline-flex items-center gap-1" data-testid={`advance-badge-${e.id}`}><PiggyBank className="w-3.5 h-3.5" /> Avance {formatCurrency(-e.balance)}</span>
                       ) : formatCurrency(e.balance)}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Link to={`/ledger/${type}/${e.id}`}>
+                        <Button variant="ghost" size="sm" className="rounded-sm text-blue-700 hover:bg-blue-50" title="Imprimer le grand livre" data-testid={`ledger-btn-${e.id}`}>
+                          <BookOpen className="w-4 h-4 mr-1" /> Grand livre
+                        </Button>
+                      </Link>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
@@ -170,7 +178,7 @@ const AccountsPage = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-12">
+                  <TableCell colSpan={5} className="text-center py-12">
                     <div className="empty-state">
                       <Wallet className="w-12 h-12 mx-auto text-slate-300 mb-3" />
                       <p>Aucun compte trouvé</p>

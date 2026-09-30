@@ -43,6 +43,8 @@ Contrainte : ne pas traduire WAVE, Orange Money, etc. Langue : français.
 
 - 2026-06 (lot 7) : Restauration d'une sauvegarde depuis Paramètres (`POST /api/backups/{file}/restore`, admin, confirmation, sauvegarde de sécurité automatique avant restauration, compteurs VTE/ACH recalculés, tracé dans l'audit) ; bouton « Grand livre » sur la fiche client / fournisseur et sur le relevé de compte → page `/ledger/:type/:id` (période, impression, Excel, `entity_id` sur `/api/reports/ledger`).
 
+- 2026-06 (lot 8) : Relance WhatsApp groupée sur le tableau de bord (bouton « Relancer tous (N) » → assistant client par client : ouverture WhatsApp pré-remplie, progression, ignorer, copier tous les messages) ; colonne « Grand livre » dans Comptes tiers (clients et fournisseurs) → `/ledger/:type/:id`.
+
 ## Backlog
 - P2 : découper `server.py` en routers modulaires
 - P2 : tests frontend automatisés
