@@ -58,12 +58,14 @@ async def get_session_detail(session_id: str, user: dict = Depends(require_modul
 
 # ==================== OVERDUE CUSTOMERS ====================
 
-@router.get("/dashboard/overdue")
-async def overdue_customers(days: Optional[int] = None, user: dict = Depends(get_current_user)):
+async def compute_overdue(days: Optional[int] = None, customer_id: Optional[str] = None) -> dict:
     if days is None:
         days = int((await load_settings()).get("overdue_days") or 7)
     now = datetime.now(timezone.utc)
-    sales = await db.sales.find({"balance_due": {"$gt": 0}, "status": {"$ne": "cancelled"}, "customer_id": {"$ne": None}}, {"_id": 0}).to_list(10000)
+    query = {"balance_due": {"$gt": 0}, "status": {"$ne": "cancelled"}, "customer_id": {"$ne": None}}
+    if customer_id:
+        query["customer_id"] = customer_id
+    sales = await db.sales.find(query, {"_id": 0}).to_list(10000)
     terms = {c["id"]: c.get("payment_terms_days") for c in await db.customers.find({"payment_terms_days": {"$ne": None}}, {"_id": 0, "id": 1, "payment_terms_days": 1}).to_list(10000)}
     grouped = {}
     for s in sales:
@@ -93,6 +95,20 @@ async def overdue_customers(days: Optional[int] = None, user: dict = Depends(get
         result.append(g)
     result.sort(key=lambda g: -g["overdue_amount"])
     return {"days": days, "customers": result, "total_overdue": round(sum(g["overdue_amount"] for g in result), 2)}
+
+
+@router.get("/dashboard/overdue")
+async def overdue_customers(days: Optional[int] = None, user: dict = Depends(get_current_user)):
+    return await compute_overdue(days)
+
+
+@router.get("/customers/{customer_id}/overdue-status")
+async def customer_overdue_status(customer_id: str, user: dict = Depends(get_current_user)):
+    data = await compute_overdue(customer_id=customer_id)
+    if not data["customers"]:
+        return {"overdue": False, "overdue_amount": 0, "days_late": 0, "invoices": []}
+    g = data["customers"][0]
+    return {"overdue": True, "overdue_amount": g["overdue_amount"], "days_late": g["days_late"], "terms_days": g["terms_days"], "invoices": g["invoices"]}
 
 
 # ==================== DAILY REPORT ====================
@@ -235,7 +251,7 @@ def fmt_dt(v) -> str:
 
 
 MODULE_LABELS = {"pos": "Vente", "sales": "Ventes", "products": "Produits", "categories": "Familles", "purchases": "Achats", "customers": "Clients", "suppliers": "Fournisseurs", "accounts": "Comptes tiers", "cash": "Caisse", "bank": "Journal Banque", "depots": "Dépôts", "reports": "Rapports", "users": "Utilisateurs", "audit": "Historique", "settings": "Paramètres"}
-ACTION_LABELS = {"create": "Création", "update": "Modification", "delete": "Suppression", "cancel": "Annulation", "return": "Retour"}
+ACTION_LABELS = {"create": "Création", "update": "Modification", "delete": "Suppression", "cancel": "Annulation", "return": "Retour", "override": "Autorisation", "restore": "Restauration"}
 CATEGORY_LABELS = {"vente": "Vente", "reglement": "Règlement", "depense": "Dépense", "versement_banque": "Versement banque", "apport": "Apport", "autre": "Autre"}
 
 

@@ -5,7 +5,8 @@ import { useSettings } from "../contexts/SettingsContext";
 import { PaymentBadge } from "../lib/paymentMethods";
 import { Button } from "../components/ui/button";
 import { toast } from "sonner";
-import { Printer, X } from "lucide-react";
+import { Printer, X, Paperclip } from "lucide-react";
+import { Attachments } from "../components/Attachments";
 
 const formatCurrency = (amount) =>
   new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", minimumFractionDigits: 0 }).format(amount || 0);
@@ -118,6 +119,13 @@ const SupplierInvoicePage = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {order && (
+          <div className="mt-8 no-print" data-testid="supplier-invoice-attachments">
+            <p className="overline mb-2 flex items-center gap-2"><Paperclip className="w-4 h-4" /> Pièces jointes (facture scannée, bon de livraison…)</p>
+            <Attachments entityType="order" entityId={order.id} />
           </div>
         )}
 

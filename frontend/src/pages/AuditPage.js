@@ -17,10 +17,11 @@ export const MODULE_LABELS = {
   bank: "Journal Banque", depots: "Dépôts", reports: "Rapports", users: "Utilisateurs", audit: "Historique", settings: "Paramètres",
 };
 
-const ACTION_LABELS = { create: "Création", update: "Modification", delete: "Suppression", cancel: "Annulation", return: "Retour" };
+const ACTION_LABELS = { create: "Création", update: "Modification", delete: "Suppression", cancel: "Annulation", return: "Retour", override: "Autorisation gérant", restore: "Restauration" };
 const ACTION_STYLES = {
   create: "bg-green-100 text-green-700", update: "bg-blue-100 text-blue-700",
   delete: "bg-red-100 text-red-700", cancel: "bg-orange-100 text-orange-700", return: "bg-purple-100 text-purple-700",
+  override: "bg-amber-100 text-amber-800", restore: "bg-teal-100 text-teal-700",
 };
 
 const formatDate = (d) => new Date(d).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });

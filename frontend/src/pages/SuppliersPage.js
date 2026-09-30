@@ -24,6 +24,7 @@ import {
 import { toast } from "sonner";
 import { Plus, Search, Edit, Trash2, Truck, Phone, Mail, User, BookOpen } from "lucide-react";
 import { Link } from "react-router-dom";
+import { AttachmentsButton } from "../components/AttachmentsButton";
 
 const SuppliersPage = () => {
   const confirm = useConfirm();
@@ -293,6 +294,7 @@ const SuppliersPage = () => {
                           <BookOpen className="w-4 h-4 mr-1" /> Grand livre
                         </Button>
                       </Link>
+                      <AttachmentsButton entityType="supplier" entityId={supplier.id} entityName={supplier.name} />
                       {(isAdmin || isVendeur) && (
                         <Button
                           variant="ghost"

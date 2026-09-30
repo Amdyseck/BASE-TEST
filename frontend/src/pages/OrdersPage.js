@@ -37,6 +37,7 @@ import {
 import { toast } from "sonner";
 import { Plus, ClipboardList, Package, Check, X, Truck, FileText, CreditCard, Warehouse, Banknote, Smartphone, Printer } from "lucide-react";
 import { Link } from "react-router-dom";
+import { AttachmentsButton } from "../components/AttachmentsButton";
 
 const OrdersPage = () => {
   const { hasModule } = useAuth();
@@ -590,6 +591,7 @@ const OrdersPage = () => {
                         {formatCurrency(order.total)}
                       </TableCell>
                       <TableCell className="text-right">
+                        <AttachmentsButton entityType="order" entityId={order.id} entityName={order.order_number} className="mr-1" />
                         <Link to={`/purchase/${order.id}`} className="inline-block mr-1">
                           <Button variant="ghost" size="sm" className="text-slate-600" title="Document d'achat" data-testid={`order-doc-${order.id}`}>
                             <Printer className="w-4 h-4" />

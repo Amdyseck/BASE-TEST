@@ -9,7 +9,9 @@ import { Label } from "../components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { toast } from "sonner";
-import { Search, Plus, Minus, Trash2, Receipt, Barcode, Banknote, Smartphone, CreditCard, Lock, FileText, PackageSearch, Wallet, Ban, PiggyBank } from "lucide-react";
+import { Search, Plus, Minus, Trash2, Receipt, Barcode, Banknote, Smartphone, CreditCard, Lock, FileText, PackageSearch, Wallet, Ban, PiggyBank, ShieldAlert } from "lucide-react";
+import { ManagerAuthDialog } from "../components/ManagerAuthDialog";
+import { ProductThumb } from "../components/Attachments";
 
 const formatCurrency = (amount) =>
   new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", minimumFractionDigits: 0 }).format(amount || 0);
@@ -26,7 +28,10 @@ const PAYMENT_METHODS = [
 
 const POSPage = () => {
   const navigate = useNavigate();
-  const { user, can, permissions } = useAuth();
+  const { user, can, permissions, isManager } = useAuth();
+  const [overdue, setOverdue] = useState(null);
+  const [authOpen, setAuthOpen] = useState(false);
+
   const canEditPrices = can("can_edit_prices");
   const maxDiscountPct = user?.role === "admin" ? 100 : permissions.max_discount_percent ?? 0;
   const barcodeInputRef = useRef(null);
@@ -121,6 +126,12 @@ const POSPage = () => {
     setAmountPaid(0);
   };
 
+useEffect(() => {
+    if (!selectedCustomer || selectedCustomer === "comptoir") { setOverdue(null); return; }
+    api.get(`/customers/${selectedCustomer}/overdue-status`).then((r) => setOverdue(r.data.overdue ? r.data : null)).catch(() => setOverdue(null));
+    // eslint-disable-next-line
+  }, [selectedCustomer]);
+
   const selectedCustomerObj = customers.find((c) => c.id === selectedCustomer);
   const advanceAvailable = Math.max(0, -(selectedCustomerObj?.balance || 0));
   const isAdvance = paymentMethod === "avance";
@@ -133,7 +144,7 @@ const POSPage = () => {
   const balanceDue = total - effectiveAmountPaid - autoAdvance;
   const discountTooHigh = discount > maxDiscount + 0.01;
 
-  const handleCheckout = async () => {
+  const handleCheckout = async (managerAuth = null) => {
     if (cart.length === 0) {
       toast.error("La facture est vide");
       return;
@@ -146,6 +157,10 @@ const POSPage = () => {
       toast.error("Sélectionnez un client pour une facture non payée");
       return;
     }
+    if (overdue && balanceDue > 0 && !isManager && !managerAuth) {
+      setAuthOpen(true);
+      return false;
+    }
     setProcessing(true);
     try {
       const customerId = selectedCustomer && selectedCustomer !== "comptoir" ? selectedCustomer : null;
@@ -156,13 +171,24 @@ const POSPage = () => {
         payment_method: paymentMethod,
         amount_paid: effectiveAmountPaid,
         discount,
+        manager_authorization: managerAuth || undefined,
       });
+      if (managerAuth) toast.success("Vente autorisée par le gérant");
       toast.success(`Facture enregistrée: ${response.data.invoice_number}`);
+      setAuthOpen(false);
       navigate(`/invoice/${response.data.id}`);
       clearCart();
       fetchData();
+      return true;
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Erreur lors de la vente");
+      const detail = error.response?.data?.detail;
+      if (detail?.code === "OVERDUE_AUTH_REQUIRED") {
+        setOverdue({ overdue: true, overdue_amount: detail.overdue_amount, days_late: detail.days_late });
+        setAuthOpen(true);
+      } else {
+        toast.error(typeof detail === "string" ? detail : detail?.message || "Erreur lors de la vente");
+      }
+      return false;
     } finally {
       setProcessing(false);
     }
@@ -248,6 +274,12 @@ const POSPage = () => {
                   {isAdvance ? <p className="text-xs mt-1">La facture sera réglée avec l'avance ({formatCurrency(effectiveAmountPaid)}).</p> : autoAdvance > 0 ? <p className="text-xs mt-1">{formatCurrency(autoAdvance)} seront imputés automatiquement sur cette facture.</p> : null}
                 </div>
               )}
+              {overdue && (
+                <div className="p-3 bg-red-50 border-2 border-red-300 rounded-sm text-sm text-red-800" data-testid="overdue-block-notice">
+                  <p className="font-bold flex items-center gap-2"><ShieldAlert className="w-4 h-4" /> Client en retard de paiement</p>
+                  <p className="text-xs mt-1">{formatCurrency(overdue.overdue_amount)} impayés depuis {overdue.days_late} jours. {isManager ? "Vente à crédit autorisée (gérant) — elle sera tracée dans l'historique." : "Vente à crédit bloquée : paiement comptant ou autorisation du gérant requise."}</p>
+                </div>
+              )}
               {isUnpaid || isAdvance ? (
                 <div className={`p-3 rounded-sm text-sm ${isAdvance ? "bg-teal-50 border border-teal-200 text-teal-800" : "bg-red-50 border border-red-200 text-red-700"}`} data-testid={isAdvance ? "advance-pay-notice" : "unpaid-notice"}>
                   {isAdvance ? "Règlement par avance client : aucun encaissement." : `Facture à crédit : aucun montant encaissé. Le total sera porté au compte du client${selectedCustomer === "comptoir" ? " — sélectionnez un client." : "."}`}
@@ -276,7 +308,7 @@ const POSPage = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <Button variant="outline" onClick={clearCart} className="rounded-sm" data-testid="clear-cart-btn">Vider</Button>
-                <Button onClick={handleCheckout} disabled={cart.length === 0 || processing || discountTooHigh || (isUnpaid && selectedCustomer === "comptoir")} className="btn-accent" data-testid="checkout-btn">
+                <Button onClick={() => handleCheckout()} disabled={cart.length === 0 || processing || discountTooHigh || (isUnpaid && selectedCustomer === "comptoir")} className="btn-accent" data-testid="checkout-btn">
                   {processing ? <div className="spinner w-4 h-4" /> : <><Receipt className="w-4 h-4 mr-2" /> Valider</>}
                 </Button>
               </div>
@@ -383,9 +415,12 @@ const POSPage = () => {
                     className="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left hover:bg-green-50/60 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     data-testid={`pos-product-${product.id}`}
                   >
-                    <div className="min-w-0">
-                      <p className="font-medium text-slate-900 text-sm truncate">{product.name}</p>
-                      <p className="text-[11px] text-slate-400 font-mono">{product.sku}</p>
+                    <div className="min-w-0 flex items-center gap-2">
+                      <ProductThumb product={product} size="w-9 h-9" />
+                      <div className="min-w-0">
+                        <p className="font-medium text-slate-900 text-sm truncate">{product.name}</p>
+                        <p className="text-[11px] text-slate-400 font-mono">{product.sku}</p>
+                      </div>
                     </div>
                     <div className="text-right flex-shrink-0">
                       <p className="font-mono font-medium text-slate-900 text-sm">{formatCurrency(product.price)}</p>
@@ -401,6 +436,7 @@ const POSPage = () => {
           </Card>
         </div>
       </div>
+      <ManagerAuthDialog open={authOpen} onOpenChange={setAuthOpen} overdue={overdue} customerName={customerName} processing={processing} onAuthorize={(auth) => handleCheckout(auth)} />
     </div>
   );
 };

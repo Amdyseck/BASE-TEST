@@ -98,6 +98,7 @@ class ProductBase(BaseModel):
 
 class Product(ProductBase):
     model_config = ConfigDict(extra="ignore")
+    image_file_id: Optional[str] = None
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -149,6 +150,10 @@ class SaleItem(BaseModel):
     unit_price: float
     total: float
 
+class ManagerAuthorization(BaseModel):
+    email: str
+    password: str
+
 class SaleBase(BaseModel):
     items: List[SaleItem]
     customer_id: Optional[str] = None
@@ -157,6 +162,7 @@ class SaleBase(BaseModel):
     amount_paid: float = 0
     discount: float = 0
     notes: Optional[str] = ""
+    manager_authorization: Optional[ManagerAuthorization] = None
 
 class Sale(SaleBase):
     model_config = ConfigDict(extra="ignore")
@@ -1024,7 +1030,27 @@ async def create_sale(sale_data: SaleBase, user: dict = Depends(require_module("
             balance_due = round(balance_due - auto_advance, 2)
             advance_used = auto_advance
     is_paid = balance_due <= 0
-    
+
+    # Blocage vente à crédit pour un client en retard (sauf autorisation gérant)
+    override_by = None
+    if customer and balance_due > 0:
+        from export_routes import compute_overdue
+        overdue = await compute_overdue(customer_id=customer["id"])
+        if overdue["customers"]:
+            g = overdue["customers"][0]
+            if user.get("role") in ("admin", "gerant"):
+                override_by = user["name"]
+            elif sale_data.manager_authorization:
+                em = sale_data.manager_authorization.email.strip()
+                mgr = await db.users.find_one({"email": {"$in": [em, em.lower()]}})
+                if not mgr or mgr.get("role") not in ("admin", "gerant") or not verify_password(sale_data.manager_authorization.password, mgr["password"]):
+                    raise HTTPException(status_code=403, detail="Identifiants du gérant incorrects ou compte non autorisé")
+                override_by = mgr["name"]
+            else:
+                amount_txt = f"{g['overdue_amount']:,.0f}".replace(",", " ")
+                raise HTTPException(status_code=403, detail={"code": "OVERDUE_AUTH_REQUIRED", "message": f"Client en retard de paiement ({g['days_late']} jours, {amount_txt} F CFA impayés). Vente à crédit bloquée : autorisation du gérant requise.", "overdue_amount": g["overdue_amount"], "days_late": g["days_late"]})
+    sale_data.manager_authorization = None
+
     # Generate invoice number
     invoice_number = await generate_invoice_number()
     
@@ -1091,7 +1117,11 @@ async def create_sale(sale_data: SaleBase, user: dict = Depends(require_module("
         bank_doc = bank_entry.model_dump()
         bank_doc["created_at"] = bank_doc["created_at"].isoformat()
         await db.bank_journal.insert_one(bank_doc)
-    
+
+    if override_by:
+        await log_audit(user, "override", "sales", "sales", sale.id, invoice_number, after={"client": sale_data.customer_name, "reste_du": round(max(0, balance_due), 2), "autorise_par": override_by, "motif": "Vente à crédit à un client en retard"})
+        await db.sales.update_one({"id": sale.id}, {"$set": {"credit_override_by": override_by}})
+
     return sale
 
 @api_router.get("/sales", response_model=List[Sale])
@@ -1753,9 +1783,11 @@ def _include_extra_routes():
     from extra_routes import router as extra_router
     from export_routes import router as export_router
     from ledger_backup_routes import router as ledger_router
+    from files_routes import router as files_router
     api_router.include_router(extra_router)
     api_router.include_router(export_router)
     api_router.include_router(ledger_router)
+    api_router.include_router(files_router)
 
 _include_extra_routes()
 app.include_router(api_router)
