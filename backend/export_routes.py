@@ -229,7 +229,7 @@ def fmt_dt(v) -> str:
         return str(v or "")
 
 
-MODULE_LABELS = {"pos": "Facturation", "sales": "Ventes", "products": "Produits", "categories": "Familles", "purchases": "Achats", "customers": "Clients", "suppliers": "Fournisseurs", "accounts": "Comptes tiers", "cash": "Gestion caisse", "bank": "Journal Banque", "depots": "Dépôts", "reports": "Rapports", "users": "Utilisateurs", "audit": "Historique", "settings": "Paramètres"}
+MODULE_LABELS = {"pos": "Vente", "sales": "Ventes", "products": "Produits", "categories": "Familles", "purchases": "Achats", "customers": "Clients", "suppliers": "Fournisseurs", "accounts": "Comptes tiers", "cash": "Caisse", "bank": "Journal Banque", "depots": "Dépôts", "reports": "Rapports", "users": "Utilisateurs", "audit": "Historique", "settings": "Paramètres"}
 ACTION_LABELS = {"create": "Création", "update": "Modification", "delete": "Suppression", "cancel": "Annulation", "return": "Retour"}
 CATEGORY_LABELS = {"vente": "Vente", "reglement": "Règlement", "depense": "Dépense", "versement_banque": "Versement banque", "apport": "Apport", "autre": "Autre"}
 

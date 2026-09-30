@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import api from "../lib/api";
 import { PaymentBadge } from "../lib/paymentMethods";
-import { DailyReport } from "../components/DailyReport";
+import { LedgerReport } from "../components/LedgerReport";
 import { MarginReport } from "../components/MarginReport";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -36,7 +36,7 @@ import {
   Users,
   Truck,
   Warehouse,
-  CalendarDays,
+  BookOpen,
   Percent,
 } from "lucide-react";
 import { format } from "date-fns";
@@ -185,12 +185,8 @@ const ReportsPage = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="daily" className="space-y-6">
+      <Tabs defaultValue="margin" className="space-y-6">
         <TabsList className="bg-white border border-slate-200 p-1 rounded-sm no-print">
-          <TabsTrigger value="daily" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white" data-testid="tab-daily">
-            <CalendarDays className="w-4 h-4 mr-2" />
-            Rapport journalier
-          </TabsTrigger>
           <TabsTrigger value="margin" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white" data-testid="tab-margin">
             <Percent className="w-4 h-4 mr-2" />
             Marges
@@ -207,10 +203,14 @@ const ReportsPage = () => {
             <Users className="w-4 h-4 mr-2" />
             Comptes tiers
           </TabsTrigger>
+          <TabsTrigger value="ledger" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white" data-testid="tab-ledger">
+            <BookOpen className="w-4 h-4 mr-2" />
+            Grand livre
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="daily">
-          <DailyReport />
+        <TabsContent value="ledger">
+          <LedgerReport />
         </TabsContent>
 
         <TabsContent value="margin">

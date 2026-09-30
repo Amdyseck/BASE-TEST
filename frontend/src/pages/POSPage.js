@@ -183,7 +183,7 @@ const POSPage = () => {
     <div className="space-y-4" data-testid="pos-page">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold font-[Chivo] tracking-tight text-slate-900">Facturation</h1>
+          <h1 className="text-2xl font-bold font-[Chivo] tracking-tight text-slate-900">VENTE</h1>
           <p className="text-slate-500 mt-1">Composez la facture, choisissez le règlement et validez</p>
         </div>
         {cashSession === null && (

@@ -967,10 +967,12 @@ async def apply_advance(entity_type: str, entity_id: str, amount: Optional[float
 
 # ==================== SALES ROUTES ====================
 
+async def next_sequence(name: str) -> int:
+    doc = await db.counters.find_one_and_update({"_id": name}, {"$inc": {"seq": 1}}, upsert=True, return_document=True)
+    return int(doc["seq"])
+
 async def generate_invoice_number():
-    today = datetime.now(timezone.utc).strftime("%Y%m%d")
-    count = await db.sales.count_documents({"invoice_number": {"$regex": f"^FAC-{today}"}})
-    return f"FAC-{today}-{str(count + 1).zfill(4)}"
+    return f"VTE{str(await next_sequence('sale')).zfill(7)}"
 
 @api_router.post("/sales", response_model=Sale)
 async def create_sale(sale_data: SaleBase, user: dict = Depends(require_module("pos"))):
@@ -1370,9 +1372,7 @@ async def assign_products_to_depot(depot_id: str, product_ids: Optional[List[str
 # ==================== ORDERS ROUTES ====================
 
 async def generate_order_number():
-    today = datetime.now(timezone.utc).strftime("%Y%m%d")
-    count = await db.orders.count_documents({"order_number": {"$regex": f"^ACH-{today}"}})
-    return f"ACH-{today}-{str(count + 1).zfill(4)}"
+    return f"ACH{str(await next_sequence('order')).zfill(6)}"
 
 async def generate_supplier_invoice_number():
     today = datetime.now(timezone.utc).strftime("%Y%m%d")
@@ -1751,8 +1751,10 @@ async def root():
 def _include_extra_routes():
     from extra_routes import router as extra_router
     from export_routes import router as export_router
+    from ledger_backup_routes import router as ledger_router
     api_router.include_router(extra_router)
     api_router.include_router(export_router)
+    api_router.include_router(ledger_router)
 
 _include_extra_routes()
 app.include_router(api_router)

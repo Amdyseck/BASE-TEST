@@ -8,6 +8,7 @@ import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { toast } from "sonner";
+import { BackupsCard } from "../components/BackupsCard";
 import { Building2, Upload, Trash2, Save, ImageIcon } from "lucide-react";
 
 const FIELDS = [
@@ -176,6 +177,8 @@ const SettingsPage = () => {
             </form>
           </CardContent>
         </Card>
+
+        <BackupsCard />
       </div>
     </div>
   );

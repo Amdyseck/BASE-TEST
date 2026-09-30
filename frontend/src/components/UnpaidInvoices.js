@@ -104,7 +104,7 @@ export const UnpaidInvoices = ({ onPaid }) => {
     const ref = quickRef.trim().toLowerCase();
     if (!ref) return;
     const digits = ref.replace(/\D/g, "");
-    const matchSale = (x) => x.invoice_number.toLowerCase() === ref || (digits && x.invoice_number.endsWith(`-${digits.padStart(4, "0")}`)) || x.invoice_number.toLowerCase().endsWith(ref);
+    const matchSale = (x) => x.invoice_number.toLowerCase() === ref || (digits && (x.invoice_number.endsWith(`-${digits.padStart(4, "0")}`) || x.invoice_number === `VTE${digits.padStart(7, "0")}`)) || x.invoice_number.toLowerCase().endsWith(ref);
     const found = sales.find(matchSale) || supplierInvoices.find(matchSale);
     if (found) {
       openPay(found, sales.includes(found) ? "customer" : "supplier");
@@ -215,7 +215,7 @@ export const UnpaidInvoices = ({ onPaid }) => {
             autoFocus
             value={quickRef}
             onChange={(e) => setQuickRef(e.target.value)}
-            placeholder="Encaissement rapide : saisir ou scanner le N° de facture (ex: FAC-20260925-0014 ou 14) puis Entrée"
+            placeholder="Encaissement rapide : saisir ou scanner le N° de facture (ex: VTE0000014 ou 14) puis Entrée"
             className="pl-11 h-11 rounded-sm font-mono bg-white text-base"
             data-testid="quick-invoice-input"
           />

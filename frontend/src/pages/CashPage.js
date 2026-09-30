@@ -157,7 +157,7 @@ const CashPage = () => {
     <div className="space-y-6" data-testid="cash-page">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold font-[Chivo] tracking-tight text-slate-900">Gestion de caisse</h1>
+          <h1 className="text-2xl font-bold font-[Chivo] tracking-tight text-slate-900">CAISSE</h1>
           <p className="text-slate-500 mt-1">Ouverture, mouvements et clôture de la caisse espèces</p>
         </div>
         <div className="flex gap-2">
@@ -200,7 +200,7 @@ const CashPage = () => {
               </div>
               <div>
                 <p className="stat-card-label">Solde théorique</p>
-                <p className="stat-card-value" data-testid="expected-amount">{formatCurrency(summary?.expected)}</p>
+                <p className="stat-card-value text-green-700" data-testid="expected-amount">{formatCurrency(summary?.expected)}</p>
               </div>
             </div>
           </CardContent>
@@ -242,7 +242,7 @@ const CashPage = () => {
           <div className="grid grid-cols-3 gap-4">
             <Card className="stat-card"><CardContent className="pt-4"><p className="stat-card-label">Entrées</p><p className="stat-card-value text-green-700">{formatCurrency(movSummary.total_in)}</p></CardContent></Card>
             <Card className="stat-card"><CardContent className="pt-4"><p className="stat-card-label">Sorties</p><p className="stat-card-value text-red-600">{formatCurrency(movSummary.total_out)}</p></CardContent></Card>
-            <Card className="stat-card"><CardContent className="pt-4"><p className="stat-card-label">Net</p><p className="stat-card-value">{formatCurrency(movSummary.net)}</p></CardContent></Card>
+            <Card className="stat-card"><CardContent className="pt-4"><p className="stat-card-label">Solde</p><p className="stat-card-value text-green-700" data-testid="cash-net">{formatCurrency(movSummary.net)}</p></CardContent></Card>
           </div>
           <Card className="table-container">
             <Table className="data-table">
@@ -360,7 +360,7 @@ const CashPage = () => {
           <form onSubmit={handleClose} className="space-y-4">
             <div className="p-3 bg-slate-50 rounded-sm text-sm flex justify-between">
               <span className="text-slate-500">Solde théorique</span>
-              <span className="font-mono font-medium">{formatCurrency(summary?.expected)}</span>
+              <span className="font-mono font-medium text-green-700">{formatCurrency(summary?.expected)}</span>
             </div>
             <div className="space-y-2">
               <Label className="overline">Montant compté (XOF)</Label>

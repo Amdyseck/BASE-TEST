@@ -95,54 +95,60 @@ const InvoicePage = () => {
     );
   }
 
-  // Invoice content component for reuse
-  const InvoiceContent = ({ copyType }) => (
-    <div className="invoice-copy">
+  // Invoice content component for reuse (preview + print copies)
+  const InvoiceContent = ({ copyType, size = "sm" }) => {
+    const lg = size === "lg";
+    const txt = lg ? "text-sm" : "text-xs";
+    return (
+    <div className="invoice-copy flex flex-col" data-testid={lg ? "invoice-preview" : undefined}>
       {/* Header */}
       <div className="invoice-header">
         <div className="flex items-center justify-between">
-          <CompanyHeader />
+          <CompanyHeader size={size} />
           <div className="text-right">
-            <p className="text-lg font-bold font-[Chivo] text-slate-900">FACTURE</p>
-            <p className="font-mono text-sm text-slate-600">{sale.invoice_number}</p>
-            {copyType && (
-              <p className="text-xs text-slate-400 mt-1">Copie: {copyType}</p>
+            <p className={`${lg ? "text-2xl" : "text-lg"} font-bold font-[Chivo] text-slate-900`}>FACTURE</p>
+            <p className={`font-mono ${lg ? "text-lg" : "text-sm"} text-slate-600`} data-testid={lg ? "invoice-number" : undefined}>{sale.invoice_number}</p>
+            {copyType && <p className="text-xs text-slate-400 mt-1">Copie: {copyType}</p>}
+            {lg && sale.status === "cancelled" && (
+              <span className="inline-block mt-2 px-3 py-1 bg-red-100 text-red-700 text-sm font-medium rounded-full">ANNULÉE</span>
             )}
           </div>
         </div>
       </div>
 
-      {/* Info section */}
-      <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-        <div>
-          <p className="overline mb-1">Facturé à</p>
-          <p className="font-medium text-slate-900">{sale.customer_name}</p>
+      {/* Client + date en haut */}
+      <div className={`grid grid-cols-3 gap-3 ${lg ? "mb-6" : "mb-3"} ${txt} invoice-info`} data-testid={lg ? "invoice-info" : undefined}>
+        <div className="border border-blue-200 rounded-sm p-2 col-span-1">
+          <p className="overline mb-1">Client</p>
+          <p className={`font-bold text-slate-900 ${lg ? "text-base" : ""}`} data-testid={lg ? "invoice-customer" : undefined}>{sale.customer_name || "Client comptant"}</p>
         </div>
-        <div className="text-right">
+        <div className="border border-blue-200 rounded-sm p-2">
           <p className="overline mb-1">Date</p>
-          <p className="text-slate-900 text-xs">{formatDate(sale.created_at)}</p>
-          <p className="overline mt-2 mb-1">Caissier</p>
-          <p className="text-slate-900 text-xs">{sale.cashier_name}</p>
+          <p className="font-medium text-slate-900" data-testid={lg ? "invoice-date" : undefined}>{formatDate(sale.created_at)}</p>
+        </div>
+        <div className="border border-blue-200 rounded-sm p-2">
+          <p className="overline mb-1">Vendeur / Caissier</p>
+          <p className="font-medium text-slate-900">{sale.cashier_name}</p>
         </div>
       </div>
 
       {/* Items table */}
-      <table className="invoice-table w-full mb-4 text-sm">
+      <table className={`invoice-table w-full ${lg ? "mb-6" : "mb-3"} ${txt}`} data-testid={lg ? "invoice-items-table" : undefined}>
         <thead>
-          <tr>
-            <th className="w-1/2 text-left py-1">Désignation</th>
-            <th className="text-right py-1">Qté</th>
-            <th className="text-right py-1">P.U.</th>
-            <th className="text-right py-1">Total</th>
+          <tr className="bg-slate-100">
+            <th className="w-1/2 text-left py-1.5 px-2">Désignation</th>
+            <th className="text-right py-1.5 px-2">{lg ? "Quantité" : "Qté"}</th>
+            <th className="text-right py-1.5 px-2">{lg ? "Prix unitaire" : "P.U."}</th>
+            <th className="text-right py-1.5 px-2">Total</th>
           </tr>
         </thead>
         <tbody>
           {sale.items.map((item, index) => (
             <tr key={index}>
-              <td className="py-1">{item.product_name}</td>
-              <td className="text-right py-1">{item.quantity}</td>
-              <td className="text-right py-1">{formatCurrency(item.unit_price)}</td>
-              <td className="text-right py-1">{formatCurrency(item.total)}</td>
+              <td className="py-1 px-2">{item.product_name}</td>
+              <td className="text-right py-1 px-2">{item.quantity}</td>
+              <td className="text-right py-1 px-2">{formatCurrency(item.unit_price)}</td>
+              <td className="text-right py-1 px-2">{formatCurrency(item.total)}</td>
             </tr>
           ))}
         </tbody>
@@ -150,51 +156,52 @@ const InvoicePage = () => {
 
       {/* Totals */}
       <div className="flex justify-end">
-        <div className="w-48 space-y-1 text-sm">
-          <div className="flex justify-between py-1 border-b border-slate-100">
+        <div className={`${lg ? "w-64 space-y-2" : "w-48 space-y-1"} ${txt}`}>
+          <div className="flex justify-between py-1 border-b border-blue-100">
             <span className="text-slate-500">Sous-total</span>
             <span className="font-mono">{formatCurrency(sale.subtotal)}</span>
           </div>
           {sale.discount > 0 && (
-            <div className="flex justify-between py-1 border-b border-slate-100 text-green-600">
+            <div className="flex justify-between py-1 border-b border-blue-100 text-green-600">
               <span>Remise</span>
               <span className="font-mono">-{formatCurrency(sale.discount)}</span>
             </div>
           )}
-          <div className="flex justify-between py-2 bg-slate-900 text-white px-2 rounded-sm mt-2">
+          <div className={`flex justify-between ${lg ? "py-3 px-3" : "py-2 px-2"} bg-slate-900 text-white rounded-sm mt-2`}>
             <span className="font-bold">TOTAL</span>
-            <span className="font-mono font-bold">{formatCurrency(sale.total)}</span>
+            <span className={`font-mono font-bold ${lg ? "text-lg" : ""}`} data-testid={lg ? "invoice-total" : undefined}>{formatCurrency(sale.total)}</span>
           </div>
-          {sale.balance_due > 0 && (
-            <div className="flex justify-between py-1 text-orange-600">
-              <span>Reste à payer</span>
-              <span className="font-mono font-medium">{formatCurrency(sale.balance_due)}</span>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Payment info */}
-      <div className="mt-4 pt-3 border-t border-slate-200 text-sm">
-        <div className="flex items-center gap-2">
-          <span className="overline">Règlement:</span>
-          <PaymentBadge method={sale.payment_method} />
-        </div>
-        {sale.amount_paid > 0 && (
-          <div className="mt-1 text-xs text-slate-500">
-            Montant reçu: {formatCurrency(sale.amount_paid)}
+      {/* Règlement — en bas de la facture */}
+      <div className={`mt-auto ${lg ? "pt-6 mt-8" : "pt-3 mt-4"} border-t-2 border-slate-900 invoice-settlement`} data-testid={lg ? "invoice-settlement" : undefined}>
+        <p className="overline mb-2">Règlement</p>
+        <div className={`grid grid-cols-3 gap-3 ${txt}`}>
+          <div className="border border-blue-200 rounded-sm p-2">
+            <p className="text-slate-500 mb-1">Mode de règlement</p>
+            <PaymentBadge method={sale.payment_method} className={lg ? "text-sm px-3" : ""} />
           </div>
-        )}
+          <div className="border border-blue-200 rounded-sm p-2">
+            <p className="text-slate-500 mb-1">Montant reçu</p>
+            <p className="font-mono font-medium text-green-700">{formatCurrency(sale.amount_paid || 0)}</p>
+          </div>
+          <div className={`border rounded-sm p-2 ${sale.balance_due > 0 ? "border-orange-300 bg-orange-50" : "border-blue-200"}`}>
+            <p className="text-slate-500 mb-1">Reste à payer</p>
+            <p className={`font-mono font-bold ${sale.balance_due > 0 ? "text-orange-600" : "text-slate-900"}`} data-testid={lg ? "invoice-balance-due" : undefined}>{formatCurrency(sale.balance_due || 0)}</p>
+          </div>
+        </div>
       </div>
 
       {/* Footer */}
-      <div className="mt-4 pt-3 border-t border-slate-200 text-center text-xs text-slate-500">
+      <div className={`${lg ? "mt-6 pt-4 text-sm" : "mt-3 pt-2 text-xs"} border-t border-slate-200 text-center text-slate-500`}>
         <p>{settings.footer_note}</p>
-        <p className="mt-1">{settings.name}</p>
+        <p className="mt-1">{settings.name}{lg && settings.slogan ? ` - ${settings.slogan}` : ""}</p>
         <p className="mt-1 text-[10px]">Ce logiciel est créé par Amdy SECK — Copyright © IBM — 77 571 93 98</p>
       </div>
     </div>
-  );
+    );
+  };
 
   return (
     <div className="min-h-screen bg-slate-100 p-4 lg:p-8" data-testid="invoice-page">
@@ -234,103 +241,7 @@ const InvoicePage = () => {
       {/* Preview - Single Invoice (shows in browser) */}
       <div className="max-w-3xl mx-auto no-print">
         <div className="invoice bg-white shadow-lg rounded-sm">
-          {/* Header */}
-          <div className="invoice-header">
-            <div className="flex items-center justify-between">
-              <CompanyHeader size="lg" />
-              <div className="text-right">
-                <p className="text-2xl font-bold font-[Chivo] text-slate-900">FACTURE</p>
-                <p className="font-mono text-lg text-slate-600">{sale.invoice_number}</p>
-                {sale.status === 'cancelled' && (
-                  <span className="inline-block mt-2 px-3 py-1 bg-red-100 text-red-700 text-sm font-medium rounded-full">
-                    ANNULÉE
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Info section */}
-          <div className="grid grid-cols-2 gap-8 mb-8">
-            <div>
-              <p className="overline mb-2">Facturé à</p>
-              <p className="font-medium text-slate-900">{sale.customer_name}</p>
-            </div>
-            <div className="text-right">
-              <p className="overline mb-2">Date</p>
-              <p className="text-slate-900">{formatDate(sale.created_at)}</p>
-              <p className="overline mt-4 mb-2">Caissier</p>
-              <p className="text-slate-900">{sale.cashier_name}</p>
-            </div>
-          </div>
-
-          {/* Items table */}
-          <table className="invoice-table w-full mb-8">
-            <thead>
-              <tr>
-                <th className="w-1/2">Désignation</th>
-                <th className="text-right">Quantité</th>
-                <th className="text-right">Prix unitaire</th>
-                <th className="text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sale.items.map((item, index) => (
-                <tr key={index}>
-                  <td>{item.product_name}</td>
-                  <td className="text-right">{item.quantity}</td>
-                  <td className="text-right">{formatCurrency(item.unit_price)}</td>
-                  <td className="text-right">{formatCurrency(item.total)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {/* Totals */}
-          <div className="flex justify-end">
-            <div className="w-64 space-y-2">
-              <div className="flex justify-between py-2 border-b border-slate-100">
-                <span className="text-slate-500">Sous-total</span>
-                <span className="font-mono">{formatCurrency(sale.subtotal)}</span>
-              </div>
-              {sale.discount > 0 && (
-                <div className="flex justify-between py-2 border-b border-slate-100 text-green-600">
-                  <span>Remise</span>
-                  <span className="font-mono">-{formatCurrency(sale.discount)}</span>
-                </div>
-              )}
-              <div className="flex justify-between py-3 bg-slate-900 text-white px-3 rounded-sm mt-4">
-                <span className="font-bold">TOTAL</span>
-                <span className="font-mono font-bold text-lg">{formatCurrency(sale.total)}</span>
-              </div>
-              {sale.balance_due > 0 && (
-                <div className="flex justify-between py-2 text-orange-600">
-                  <span>Reste à payer</span>
-                  <span className="font-mono font-medium">{formatCurrency(sale.balance_due)}</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Payment info */}
-          <div className="mt-8 pt-6 border-t border-slate-200">
-            <div className="flex items-center gap-4">
-              <span className="overline">Mode de règlement:</span>
-              <PaymentBadge method={sale.payment_method} className="text-sm px-3" />
-            </div>
-            {sale.amount_paid > 0 && (
-              <div className="mt-2 text-sm text-slate-500">
-                Montant reçu: {formatCurrency(sale.amount_paid)}
-              </div>
-            )}
-          </div>
-
-          {/* Footer */}
-          <div className="mt-8 pt-6 border-t border-slate-200 text-center text-sm text-slate-500">
-            <p>{settings.footer_note}</p>
-            <p className="mt-1">{settings.name}{settings.slogan ? ` - ${settings.slogan}` : ""}</p>
-            <p className="mt-2 text-xs">Ce logiciel est créé par Amdy SECK — Copyright © IBM — 77 571 93 98</p>
-          </div>
+          <InvoiceContent size="lg" />
         </div>
       </div>
 
@@ -427,6 +338,13 @@ const InvoicePage = () => {
           
           .invoice-copy {
             height: 100%;
+            display: flex;
+            flex-direction: column;
+          }
+          .invoice-table thead tr, .invoice-copy .bg-slate-100 {
+            background: #f1f5f9 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
           
           @page {

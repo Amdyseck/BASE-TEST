@@ -547,7 +547,7 @@ const UsersPage = () => {
                   </label>
                 ))}
               </div>
-              {selectedUser?.role === "caissier" && <p className="text-xs text-slate-500 mt-2">Le caissier ne peut pas effectuer de ventes (module Facturation désactivé).</p>}
+              {selectedUser?.role === "caissier" && <p className="text-xs text-slate-500 mt-2">Le caissier ne peut pas effectuer de ventes (module Vente désactivé).</p>}
             </div>
             <div>
               <Label className="overline block mb-2">Droits particuliers</Label>

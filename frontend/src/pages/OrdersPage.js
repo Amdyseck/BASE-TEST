@@ -694,6 +694,12 @@ const OrdersPage = () => {
                         {formatCurrency(invoice.balance_due)}
                       </TableCell>
                       <TableCell className="text-right">
+                        <Link to={`/supplier-invoice/${invoice.id}`}>
+                          <Button variant="ghost" size="sm" className="text-slate-700" data-testid={`view-supplier-invoice-${invoice.id}`}>
+                            <Printer className="w-4 h-4 mr-1" />
+                            Voir
+                          </Button>
+                        </Link>
                         {invoice.status !== 'paid' && (
                           <Button
                             variant="ghost"

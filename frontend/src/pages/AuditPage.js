@@ -12,8 +12,8 @@ import { toast } from "sonner";
 import { History, Filter, Eye, FileSpreadsheet, Printer } from "lucide-react";
 
 export const MODULE_LABELS = {
-  pos: "Facturation", sales: "Ventes", products: "Produits", categories: "Familles", purchases: "Achats",
-  customers: "Clients", suppliers: "Fournisseurs", accounts: "Comptes tiers", cash: "Gestion caisse",
+  pos: "Vente", sales: "Ventes", products: "Produits", categories: "Familles", purchases: "Achats",
+  customers: "Clients", suppliers: "Fournisseurs", accounts: "Comptes tiers", cash: "Caisse",
   bank: "Journal Banque", depots: "Dépôts", reports: "Rapports", users: "Utilisateurs", audit: "Historique", settings: "Paramètres",
 };
 
