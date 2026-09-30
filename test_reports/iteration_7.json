@@ -1,0 +1,48 @@
+{
+  "summary": "Iteration 7 tests all PASSED. Backend 14/14 pytest (test_iter7_ledger_backup.py) covering VTE/ACH numbering, Grand livre (ledger) + xlsx export, cron backup auth + duplicate detection, manual backup + list + gzip download + path traversal + role restriction, supplier-invoice detail. Frontend admin verified: sidebar groups VENTE/ACHAT/RAPPORT/INVENTAIRE (nav-group-btn-*) + CAISSE/BANQUE/TABLEAU DE BORD + Utilisateurs/Historique/Paramètres, no 'Facturation'; POS 'VENTE' title; Cash page 'CAISSE' with Solde théorique green (text-green-700); Reports without 'Rapport journalier' tab, tab-ledger renders ledger-sheet with 29 accounts + ledger-type-select + ledger-export-excel-btn; Invoice /invoice/:id shows invoice-info top + invoice-settlement bottom with Mode de règlement/Reste à payer, Ticket + A4 buttons; Orders 'Factures fournisseurs' tab shows view-supplier-invoice-*; /supplier-invoice/:id shows Désignation/Quantité/Prix unitaire/Prix total + MONTANT TOTAL + Reste à payer; Settings backups-card + run-backup-btn + download links; sales/cash tables use blue-200 border-right on th/td.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "passed_tests": [
+    "BACKEND POST /api/sales creates invoice_number VTE\\d{7} sequential (verified VTE0000001->0002->0003)",
+    "BACKEND POST /api/orders creates order_number ACH\\d{6} sequential",
+    "BACKEND GET /api/reports/ledger?entity_type=all returns accounts with opening+debit-credit=balance for every account",
+    "BACKEND GET /api/reports/ledger with start/end filters lines to period",
+    "BACKEND GET /api/export/reports/ledger.xlsx returns xlsx (PK header, spreadsheet content-type)",
+    "BACKEND POST /api/cron/backup without auth -> 401; wrong secret -> 401; correct Bearer + X-Webhook-Id -> {status:accepted}; repeated same X-Webhook-Id -> {status:duplicate}",
+    "BACKEND POST /api/backups/run (admin) creates sauvegarde_*.json.gz with file/size/documents/collections/trigger",
+    "BACKEND GET /api/backups (admin) lists the created file",
+    "BACKEND GET /api/backups/{file} downloads valid gzip parseable to JSON with 'collections' key",
+    "BACKEND GET /api/backups/..%2Fx -> 400; /api/backups/notabackup.txt -> 400",
+    "BACKEND /api/backups and /api/backups/run forbidden for gerant (403)",
+    "BACKEND GET /api/supplier-invoices/{id} returns {invoice, supplier, order, payments}; 404 for unknown; GET /api/supplier-invoices/unpaid still 200",
+    "FRONTEND sidebar (admin): nav-group-btn-{vente,achat,rapport,inventaire} + nav-cash + nav-bank-journal + nav-dashboard + nav-users + nav-audit + nav-settings all present, no 'Facturation' text",
+    "FRONTEND VENTE sub-items nav-pos, nav-sales, nav-customers appear when group open; /pos shows 'VENTE'",
+    "FRONTEND /cash: title 'CAISSE', expected-amount has class text-green-700",
+    "FRONTEND /reports: no 'Rapport journalier'; tab-ledger opens ledger-sheet with 29 ledger-account-* rows, ledger-type-select, ledger-export-excel-btn",
+    "FRONTEND /invoice/:saleId: invoice-info (Client/Date/Vendeur top) + articles table (thead gray) + invoice-settlement (Mode de règlement/Montant reçu/Reste à payer) + Ticket/A4 buttons",
+    "FRONTEND /orders tab 'Factures fournisseurs': view-supplier-invoice-* buttons open /supplier-invoice/:id with Désignation, Quantité, Prix unitaire, Prix total, supplier-invoice-total (MONTANT TOTAL) + Reste à payer",
+    "FRONTEND /settings backups-card with run-backup-btn + download link per row",
+    "FRONTEND tables /sales, /cash: th/td border-right = 1px solid rgb(191,219,254) (blue-200 séparateurs)"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_iter7_ledger_backup.py",
+    "/app/test_reports/pytest/iter7.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "ledger_backup_routes.build_ledger correctly recomputes running balance per line from opening; opening only sums lines before start (start required) - if start omitted, opening is 0 which is correct (whole history displayed as lines).",
+    "cron_backup uses hmac.compare_digest for constant-time secret comparison and BackgroundTasks so cron gets an immediate 2xx - matches Emergent cron requirement.",
+    "download_backup rejects filenames with '/' or missing sauvegarde_ prefix - path traversal safe; also FileResponse returns application/gzip.",
+    "next_sequence(counters) atomically increments (find_one_and_update upsert) - safe against races for VTE/ACH numbering.",
+    "server.py is now 1781 lines (still >700). Consider extracting sales, orders, and payments routers (non-blocking, tracked from iter6).",
+    "Frontend Layout.js correctly filters groups by module permissions and hides admin section when empty.",
+    "SupplierInvoicePage uses supplier-invoice-total testid on the total row; column borders use border-blue-200 to match spec."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter7_ledger_backup.py"],
+  "success_rate": {"backend": "100% (14/14)", "frontend": "100% (all iter7 flows verified admin)"},
+  "test_credentials": "admin@wakeur.sn/admin123, gerant.test@wakeur.sn/test1234 (unchanged)",
+  "seed_data_creation": "Created 2 new VTE sales (VTE0000002/0003) and 2 ACH orders during numbering tests + 1 supplier invoice + 1 manual backup file. No existing data deleted.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Regression file: /app/backend/tests/test_iter7_ledger_backup.py. New VTE/ACH counters are stored in the 'counters' collection (name='sale', name='order'). Backup files land in /app/backend/backups/ and rotate keeping last 30. Cron secret env var: WEBHOOK_CRON_SECRET (backend/.env)."
+}
