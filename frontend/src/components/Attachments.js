@@ -84,20 +84,20 @@ export const Attachments = ({ entityType, entityId, readOnly = false, onChange }
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {files.map((f) => (
             <div key={f.id} className="border border-blue-200 rounded-sm overflow-hidden bg-white flex flex-col" data-testid={`attachment-${f.id}`}>
-              <a href={fileUrl(f.id)} target="_blank" rel="noreferrer" className="h-28 min-h-[7rem] bg-slate-50 flex items-center justify-center overflow-hidden" data-testid={`attachment-preview-${f.id}`}>
+              <div role="button" tabIndex={0} onClick={() => window.open(fileUrl(f.id), "_blank", "noopener")} className="bg-slate-50 flex items-center justify-center overflow-hidden cursor-pointer" style={{ height: 112 }} data-testid={`attachment-preview-${f.id}`}>
                 {f.is_image ? (
-                  <img src={fileUrl(f.id)} alt={f.original_filename} className="w-full h-full object-cover" loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                  <img src={fileUrl(f.id)} alt={f.original_filename} className="w-full h-full object-cover" style={{ height: 112 }} />
                 ) : (
                   <FileText className="w-10 h-10 text-red-500" />
                 )}
-              </a>
+              </div>
               <div className="p-2 text-xs flex-1 flex flex-col gap-1">
                 <p className="font-medium text-slate-900 truncate" title={f.original_filename}>{f.label || f.original_filename}</p>
                 <p className="text-slate-500 truncate">{f.label ? f.original_filename : formatFileSize(f.size)}{f.label ? ` · ${formatFileSize(f.size)}` : ""}</p>
                 <p className="text-slate-400">{formatDate(f.created_at)} · {f.uploaded_by}</p>
                 <div className="flex items-center gap-1 mt-auto pt-1 no-print">
-                  <a href={fileUrl(f.id)} target="_blank" rel="noreferrer" title="Ouvrir"><Button variant="ghost" size="sm" className="h-7 w-7 p-0"><ExternalLink className="w-3.5 h-3.5" /></Button></a>
-                  <a href={fileUrl(f.id, true)} title="Télécharger"><Button variant="ghost" size="sm" className="h-7 w-7 p-0"><Download className="w-3.5 h-3.5" /></Button></a>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Ouvrir" onClick={() => window.open(fileUrl(f.id), "_blank", "noopener")} data-testid={`open-attachment-${f.id}`}><ExternalLink className="w-3.5 h-3.5" /></Button>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Télécharger" onClick={() => { window.location.href = fileUrl(f.id, true); }} data-testid={`download-attachment-${f.id}`}><Download className="w-3.5 h-3.5" /></Button>
                   {!readOnly && (
                     <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-600 ml-auto" onClick={() => remove(f)} title="Supprimer" data-testid={`delete-attachment-${f.id}`}><Trash2 className="w-3.5 h-3.5" /></Button>
                   )}
