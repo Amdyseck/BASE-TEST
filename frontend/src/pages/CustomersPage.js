@@ -22,11 +22,13 @@ import {
   TableRow,
 } from "../components/ui/table";
 import { toast } from "sonner";
-import { Plus, Search, Edit, Trash2, Users, Phone, Mail, BookOpen } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Users, Phone, Mail, BookOpen, Clock } from "lucide-react";
+import { useSettings } from "../contexts/SettingsContext";
 import { Link } from "react-router-dom";
 
 const CustomersPage = () => {
   const confirm = useConfirm();
+  const { settings } = useSettings();
   const { can } = useAuth();
   const canDelete = can("can_delete");
   const [customers, setCustomers] = useState([]);
@@ -39,6 +41,7 @@ const CustomersPage = () => {
     email: "",
     phone: "",
     address: "",
+    payment_terms_days: "",
   });
 
   useEffect(() => {
@@ -58,12 +61,13 @@ const CustomersPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const payload = { ...formData, payment_terms_days: formData.payment_terms_days === "" ? null : parseInt(formData.payment_terms_days, 10) };
     try {
       if (editingCustomer) {
-        await api.put(`/customers/${editingCustomer.id}`, formData);
+        await api.put(`/customers/${editingCustomer.id}`, payload);
         toast.success("Client mis à jour");
       } else {
-        await api.post("/customers", formData);
+        await api.post("/customers", payload);
         toast.success("Client créé");
       }
       setIsDialogOpen(false);
@@ -81,6 +85,7 @@ const CustomersPage = () => {
       email: customer.email || "",
       phone: customer.phone || "",
       address: customer.address || "",
+      payment_terms_days: customer.payment_terms_days ?? "",
     });
     setIsDialogOpen(true);
   };
@@ -103,6 +108,7 @@ const CustomersPage = () => {
       email: "",
       phone: "",
       address: "",
+      payment_terms_days: "",
     });
   };
 
@@ -195,6 +201,20 @@ const CustomersPage = () => {
                   data-testid="input-customer-address"
                 />
               </div>
+              <div className="space-y-2">
+                <Label className="overline">Délai de paiement accordé (jours)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="365"
+                  value={formData.payment_terms_days}
+                  onChange={(e) => setFormData({ ...formData, payment_terms_days: e.target.value })}
+                  className="rounded-sm font-mono"
+                  placeholder={`Vide = délai global (${settings.overdue_days || 7} j)`}
+                  data-testid="input-customer-terms"
+                />
+                <p className="text-xs text-slate-500">Ce client sera considéré en retard après ce nombre de jours, à la place du délai global.</p>
+              </div>
               <div className="flex justify-end gap-3 pt-4">
                 <Button
                   type="button"
@@ -237,6 +257,7 @@ const CustomersPage = () => {
               <TableHead>Client</TableHead>
               <TableHead>Contact</TableHead>
               <TableHead>Adresse</TableHead>
+              <TableHead className="text-center">Échéance</TableHead>
               <TableHead className="text-right">Total achats</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -274,6 +295,13 @@ const CustomersPage = () => {
                   <TableCell className="text-slate-500">
                     {customer.address || "-"}
                   </TableCell>
+                  <TableCell className="text-center">
+                    {customer.payment_terms_days != null && customer.payment_terms_days !== "" ? (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-mono bg-blue-100 text-blue-700" data-testid={`terms-badge-${customer.id}`}><Clock className="inline w-3 h-3 mr-1" />{customer.payment_terms_days} j</span>
+                    ) : (
+                      <span className="text-xs text-slate-400">Global ({settings.overdue_days || 7} j)</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right font-mono">
                     {formatCurrency(customer.total_purchases || 0)}
                   </TableCell>
@@ -309,7 +337,7 @@ const CustomersPage = () => {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-12">
+                <TableCell colSpan={6} className="text-center py-12">
                   <div className="empty-state">
                     <Users className="w-12 h-12 mx-auto text-slate-300 mb-3" />
                     <p>Aucun client trouvé</p>

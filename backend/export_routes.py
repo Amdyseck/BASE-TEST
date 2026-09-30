@@ -64,15 +64,18 @@ async def overdue_customers(days: Optional[int] = None, user: dict = Depends(get
         days = int((await load_settings()).get("overdue_days") or 7)
     now = datetime.now(timezone.utc)
     sales = await db.sales.find({"balance_due": {"$gt": 0}, "status": {"$ne": "cancelled"}, "customer_id": {"$ne": None}}, {"_id": 0}).to_list(10000)
+    terms = {c["id"]: c.get("payment_terms_days") for c in await db.customers.find({"payment_terms_days": {"$ne": None}}, {"_id": 0, "id": 1, "payment_terms_days": 1}).to_list(10000)}
     grouped = {}
     for s in sales:
         created = s["created_at"] if isinstance(s["created_at"], datetime) else datetime.fromisoformat(s["created_at"])
         if created.tzinfo is None:
             created = created.replace(tzinfo=timezone.utc)
         late = (now - created).days
-        if late < days:
+        limit = terms.get(s["customer_id"])
+        limit = days if limit is None else int(limit)
+        if late < limit:
             continue
-        g = grouped.setdefault(s["customer_id"], {"customer_id": s["customer_id"], "customer_name": s.get("customer_name", ""), "overdue_amount": 0, "invoices": [], "days_late": 0})
+        g = grouped.setdefault(s["customer_id"], {"customer_id": s["customer_id"], "customer_name": s.get("customer_name", ""), "overdue_amount": 0, "invoices": [], "days_late": 0, "terms_days": limit, "custom_terms": s["customer_id"] in terms})
         g["overdue_amount"] = round(g["overdue_amount"] + s["balance_due"], 2)
         g["days_late"] = max(g["days_late"], late)
         g["invoices"].append({"invoice_number": s["invoice_number"], "balance_due": s["balance_due"], "date": created.isoformat(), "days_late": late})

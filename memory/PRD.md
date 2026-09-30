@@ -47,6 +47,8 @@ Contrainte : ne pas traduire WAVE, Orange Money, etc. Langue : français.
 
 - 2026-06 (lot 9) : Délai de retard client réglable (7 / 15 / 30 jours) : sélecteur dans le widget « Rappels impayés » (admin + gérant, `PUT /api/settings/overdue-days`) et champ dans Paramètres ; valeur stockée dans `settings.overdue_days`, utilisée par défaut par `/api/dashboard/overdue`.
 
+- 2026-06 (lot 10) : Échéance par client : champ « Délai de paiement accordé (jours) » sur la fiche client (`payment_terms_days`, vide = délai global), colonne « Échéance » dans la liste Clients, prise en compte dans `/api/dashboard/overdue` (remplace le délai global pour ce client, `terms_days` / `custom_terms` renvoyés et affichés dans le widget).
+
 ## Backlog
 - P2 : découper `server.py` en routers modulaires
 - P2 : tests frontend automatisés

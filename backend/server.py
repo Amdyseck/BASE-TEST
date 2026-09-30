@@ -120,6 +120,7 @@ class CustomerBase(BaseModel):
     email: Optional[str] = ""
     phone: Optional[str] = ""
     address: Optional[str] = ""
+    payment_terms_days: Optional[int] = None  # Délai de paiement accordé (None = délai global)
 
 class Customer(CustomerBase):
     model_config = ConfigDict(extra="ignore")

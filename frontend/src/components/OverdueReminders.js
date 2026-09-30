@@ -91,7 +91,7 @@ export const OverdueReminders = ({ companyName }) => {
                   <div className="min-w-0">
                     <Link to={`/accounts/customer/${c.customer_id}`} className="font-medium text-slate-900 hover:underline truncate block">{c.customer_name}</Link>
                     <p className="text-xs text-slate-500">
-                      {c.invoices.length} facture{c.invoices.length > 1 ? "s" : ""} · retard {c.days_late} j · {c.phone || "sans téléphone"}
+                      {c.invoices.length} facture{c.invoices.length > 1 ? "s" : ""} · retard {c.days_late} j{c.custom_terms && <span className="text-blue-600" data-testid={`terms-${c.customer_id}`}> · échéance {c.terms_days} j</span>} · {c.phone || "sans téléphone"}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
