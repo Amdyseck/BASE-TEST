@@ -6,6 +6,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { toast } from "sonner";
 import { BackupsCard } from "../components/BackupsCard";
@@ -157,6 +158,17 @@ const SettingsPage = () => {
                     placeholder="Adresse complète"
                     data-testid="settings-address-input"
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label className="overline">Délai de retard client (jours)</Label>
+                  <Select value={String(form.overdue_days || 7)} onValueChange={(v) => setForm({ ...form, overdue_days: parseInt(v, 10) })}>
+                    <SelectTrigger className="rounded-sm" data-testid="settings-overdue-days-select"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="7">7 jours</SelectItem>
+                      <SelectItem value="15">15 jours</SelectItem>
+                      <SelectItem value="30">30 jours</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2 md:col-span-2">
                   <Label className="overline">Message en pied de facture</Label>

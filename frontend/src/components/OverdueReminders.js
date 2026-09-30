@@ -5,6 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { AlertCircle, MessageCircle, MessageSquare, ArrowRight, Send } from "lucide-react";
 import { BulkWhatsAppDialog } from "./BulkWhatsAppDialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { useAuth } from "../contexts/AuthContext";
+import { useSettings } from "../contexts/SettingsContext";
+import { toast } from "sonner";
 
 const formatCurrency = (amount) =>
   new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", minimumFractionDigits: 0 }).format(amount || 0);
@@ -25,10 +29,23 @@ const buildMessage = (company, c) => {
 export const OverdueReminders = ({ companyName }) => {
   const [data, setData] = useState(null);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const { isManager } = useAuth();
+  const { settings, refresh } = useSettings();
+  const days = settings.overdue_days || 7;
 
   useEffect(() => {
-    api.get("/dashboard/overdue?days=7").then((r) => setData(r.data)).catch(() => setData({ customers: [], total_overdue: 0 }));
-  }, []);
+    api.get(`/dashboard/overdue?days=${days}`).then((r) => setData(r.data)).catch(() => setData({ customers: [], total_overdue: 0, days }));
+  }, [days]);
+
+  const changeDays = async (value) => {
+    try {
+      await api.put("/settings/overdue-days", { overdue_days: parseInt(value, 10) });
+      await refresh();
+      toast.success(`Délai de retard : ${value} jours`);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Erreur lors de l'enregistrement du délai");
+    }
+  };
 
   if (!data) return null;
 
@@ -38,7 +55,18 @@ export const OverdueReminders = ({ companyName }) => {
         <div className="flex items-center justify-between">
           <CardTitle className="font-[Chivo] text-base flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-orange-600" /> Rappels impayés
-            <span className="text-xs font-normal text-slate-500">(+ de {data.days} jours)</span>
+            {isManager ? (
+              <Select value={String(days)} onValueChange={changeDays}>
+                <SelectTrigger className="h-7 w-32 rounded-sm text-xs font-normal" data-testid="overdue-days-select"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">+ de 7 jours</SelectItem>
+                  <SelectItem value="15">+ de 15 jours</SelectItem>
+                  <SelectItem value="30">+ de 30 jours</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : (
+              <span className="text-xs font-normal text-slate-500" data-testid="overdue-days-label">(+ de {data.days} jours)</span>
+            )}
           </CardTitle>
           <div className="flex items-center gap-3">
             <span className="font-mono font-bold text-orange-600" data-testid="overdue-total">{formatCurrency(data.total_overdue)}</span>

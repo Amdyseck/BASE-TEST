@@ -59,7 +59,9 @@ async def get_session_detail(session_id: str, user: dict = Depends(require_modul
 # ==================== OVERDUE CUSTOMERS ====================
 
 @router.get("/dashboard/overdue")
-async def overdue_customers(days: int = 7, user: dict = Depends(get_current_user)):
+async def overdue_customers(days: Optional[int] = None, user: dict = Depends(get_current_user)):
+    if days is None:
+        days = int((await load_settings()).get("overdue_days") or 7)
     now = datetime.now(timezone.utc)
     sales = await db.sales.find({"balance_due": {"$gt": 0}, "status": {"$ne": "cancelled"}, "customer_id": {"$ne": None}}, {"_id": 0}).to_list(10000)
     grouped = {}

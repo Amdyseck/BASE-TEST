@@ -64,6 +64,7 @@ DEFAULT_SETTINGS = {
     "rc": "",
     "footer_note": "Merci pour votre achat!",
     "alert_phone": "",
+    "overdue_days": 7,
     "logo_path": None,
     "logo_content_type": None,
     "logo_updated_at": None,
@@ -80,6 +81,11 @@ class CompanySettings(BaseModel):
     rc: Optional[str] = ""
     footer_note: Optional[str] = ""
     alert_phone: Optional[str] = ""
+    overdue_days: Optional[int] = 7
+
+
+class OverdueDays(BaseModel):
+    overdue_days: int
 
 
 async def load_settings() -> dict:
@@ -102,6 +108,16 @@ async def update_settings(data: CompanySettings, user: dict = Depends(require_ro
     await db.settings.update_one({"key": "company"}, {"$set": data.model_dump()}, upsert=True)
     await log_audit(user, "update", "settings", "settings", "company", data.name, before={k: before.get(k) for k in data.model_dump()}, after=data.model_dump())
     return await get_settings()
+
+
+@router.put("/settings/overdue-days")
+async def update_overdue_days(data: OverdueDays, user: dict = Depends(require_role(["admin", "gerant"]))):
+    if data.overdue_days not in (7, 15, 30):
+        raise HTTPException(status_code=400, detail="Délai invalide (7, 15 ou 30 jours)")
+    before = await load_settings()
+    await db.settings.update_one({"key": "company"}, {"$set": {"overdue_days": data.overdue_days}}, upsert=True)
+    await log_audit(user, "update", "settings", "settings", "company", "Délai de retard", before={"overdue_days": before.get("overdue_days")}, after={"overdue_days": data.overdue_days})
+    return {"overdue_days": data.overdue_days}
 
 
 ALLOWED_LOGO_TYPES = {"image/png", "image/jpeg", "image/webp", "image/gif"}

@@ -45,6 +45,8 @@ Contrainte : ne pas traduire WAVE, Orange Money, etc. Langue : français.
 
 - 2026-06 (lot 8) : Relance WhatsApp groupée sur le tableau de bord (bouton « Relancer tous (N) » → assistant client par client : ouverture WhatsApp pré-remplie, progression, ignorer, copier tous les messages) ; colonne « Grand livre » dans Comptes tiers (clients et fournisseurs) → `/ledger/:type/:id`.
 
+- 2026-06 (lot 9) : Délai de retard client réglable (7 / 15 / 30 jours) : sélecteur dans le widget « Rappels impayés » (admin + gérant, `PUT /api/settings/overdue-days`) et champ dans Paramètres ; valeur stockée dans `settings.overdue_days`, utilisée par défaut par `/api/dashboard/overdue`.
+
 ## Backlog
 - P2 : découper `server.py` en routers modulaires
 - P2 : tests frontend automatisés
