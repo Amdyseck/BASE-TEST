@@ -23,7 +23,7 @@ const CATEGORIES = [
   { value: "autre", label: "Autre", type: null },
 ];
 
-const CATEGORY_LABELS = { vente: "Vente", reglement: "Règlement", depense: "Dépense", versement_banque: "Versement banque", apport: "Apport", autre: "Autre" };
+const CATEGORY_LABELS = { vente: "Vente", reglement: "Règlement", depense: "Dépense", versement_banque: "Versement banque", apport: "Apport", retour: "Retour", autre: "Autre" };
 
 const formatCurrency = (amount) =>
   new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", minimumFractionDigits: 0 }).format(amount || 0);
@@ -240,8 +240,8 @@ const CashPage = () => {
             )}
           </div>
           <div className="grid grid-cols-3 gap-4">
-            <Card className="stat-card"><CardContent className="pt-4"><p className="stat-card-label">Entrées</p><p className="stat-card-value text-green-700">{formatCurrency(movSummary.total_in)}</p></CardContent></Card>
-            <Card className="stat-card"><CardContent className="pt-4"><p className="stat-card-label">Sorties</p><p className="stat-card-value text-red-600">{formatCurrency(movSummary.total_out)}</p></CardContent></Card>
+            <Card className="stat-card"><CardContent className="pt-4"><p className="stat-card-label">Débit (entrées)</p><p className="stat-card-value text-green-700">{formatCurrency(movSummary.total_in)}</p></CardContent></Card>
+            <Card className="stat-card"><CardContent className="pt-4"><p className="stat-card-label">Crédit (sorties)</p><p className="stat-card-value text-red-600">{formatCurrency(movSummary.total_out)}</p></CardContent></Card>
             <Card className="stat-card"><CardContent className="pt-4"><p className="stat-card-label">Solde</p><p className="stat-card-value text-green-700" data-testid="cash-net">{formatCurrency(movSummary.net)}</p></CardContent></Card>
           </div>
           <Card className="table-container">
@@ -252,7 +252,8 @@ const CashPage = () => {
                   <TableHead>Description</TableHead>
                   <TableHead>Catégorie</TableHead>
                   <TableHead>Par</TableHead>
-                  <TableHead className="text-right">Montant</TableHead>
+                  <TableHead className="text-right">Débit</TableHead>
+                  <TableHead className="text-right">Crédit</TableHead>
                   {canDelete && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
@@ -266,8 +267,11 @@ const CashPage = () => {
                     </TableCell>
                     <TableCell><span className="px-2 py-1 rounded-full text-xs bg-slate-100 text-slate-700">{CATEGORY_LABELS[m.category] || m.category}</span></TableCell>
                     <TableCell className="text-slate-500 text-sm">{m.created_by}</TableCell>
-                    <TableCell className={`text-right font-mono font-medium ${m.type === "in" ? "text-green-700" : "text-red-600"}`}>
-                      {m.type === "in" ? "+" : "-"}{formatCurrency(m.amount)}
+                    <TableCell className="text-right font-mono font-medium text-green-700" data-testid={`movement-debit-${m.id}`}>
+                      {m.type === "in" ? formatCurrency(m.amount) : ""}
+                    </TableCell>
+                    <TableCell className="text-right font-mono font-medium text-red-600" data-testid={`movement-credit-${m.id}`}>
+                      {m.type === "out" ? formatCurrency(m.amount) : ""}
                     </TableCell>
                     {canDelete && (
                       <TableCell className="text-right">
@@ -281,7 +285,7 @@ const CashPage = () => {
                   </TableRow>
                 )) : (
                   <TableRow>
-                    <TableCell colSpan={canDelete ? 6 : 5} className="text-center py-12">
+                    <TableCell colSpan={canDelete ? 7 : 6} className="text-center py-12">
                       <div className="empty-state">
                         <Banknote className="w-12 h-12 mx-auto text-slate-300 mb-3" />
                         <p>Aucun mouvement de caisse</p>

@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import api from "../lib/api";
 import { useSettings } from "../contexts/SettingsContext";
 import { PaymentBadge } from "../lib/paymentMethods";
 import { Button } from "../components/ui/button";
 import { toast } from "sonner";
-import { Printer, X, Paperclip } from "lucide-react";
+import { Printer, X, Paperclip, Undo2 } from "lucide-react";
 import { Attachments } from "../components/Attachments";
 
 const formatCurrency = (amount) =>
@@ -38,7 +38,12 @@ const SupplierInvoicePage = () => {
     <div className="min-h-screen bg-slate-100 p-4 lg:p-8" data-testid="supplier-invoice-page">
       <div className="max-w-4xl mx-auto mb-4 flex items-center justify-between no-print">
         <Button variant="outline" className="rounded-sm" onClick={() => navigate("/orders")} data-testid="supplier-invoice-close-btn"><X className="w-4 h-4 mr-2" /> Fermer</Button>
-        <Button onClick={() => window.print()} className="btn-primary" data-testid="print-supplier-invoice-btn"><Printer className="w-4 h-4 mr-2" /> Imprimer</Button>
+        <div className="flex gap-2">
+          <Link to={`/returns/supplier?invoice=${invoice.id}`}>
+            <Button variant="outline" className="rounded-sm text-orange-700 border-orange-300" data-testid="supplier-return-btn"><Undo2 className="w-4 h-4 mr-2" /> Retour fournisseur</Button>
+          </Link>
+          <Button onClick={() => window.print()} className="btn-primary" data-testid="print-supplier-invoice-btn"><Printer className="w-4 h-4 mr-2" /> Imprimer</Button>
+        </div>
       </div>
 
       <div className="max-w-4xl mx-auto bg-white shadow-lg rounded-sm p-8 purchase-sheet">

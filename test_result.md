@@ -11,7 +11,7 @@ Testing the new features for purchases and supplier invoices:
 ## Test Credentials
 - Email: admin@wakeur.sn
 - Password: admin123
-- API Base: https://food-commerce-hub-3.preview.emergentagent.com/api
+- API Base: https://wakeur-sales-system.preview.emergentagent.com/api
 
 backend:
   - task: "Login Authentication"

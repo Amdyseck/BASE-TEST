@@ -252,7 +252,7 @@ def fmt_dt(v) -> str:
 
 MODULE_LABELS = {"pos": "Vente", "sales": "Ventes", "products": "Produits", "categories": "Familles", "purchases": "Achats", "customers": "Clients", "suppliers": "Fournisseurs", "accounts": "Comptes tiers", "cash": "Caisse", "bank": "Journal Banque", "depots": "Dépôts", "reports": "Rapports", "users": "Utilisateurs", "audit": "Historique", "settings": "Paramètres"}
 ACTION_LABELS = {"create": "Création", "update": "Modification", "delete": "Suppression", "cancel": "Annulation", "return": "Retour", "override": "Autorisation", "restore": "Restauration"}
-CATEGORY_LABELS = {"vente": "Vente", "reglement": "Règlement", "depense": "Dépense", "versement_banque": "Versement banque", "apport": "Apport", "autre": "Autre"}
+CATEGORY_LABELS = {"vente": "Vente", "reglement": "Règlement", "depense": "Dépense", "versement_banque": "Versement banque", "apport": "Apport", "retour": "Retour", "autre": "Autre"}
 
 
 def _diff(before, after) -> str:
@@ -321,7 +321,7 @@ async def export_cash(session_id: Optional[str] = None, date: Optional[str] = No
     total_out = sum(m["amount"] for m in movements if m["type"] == "out")
     rows.append(["", "TOTAUX", "", "", "", round(total_in, 2), round(total_out, 2)])
     rows.append(["", "NET", "", "", "", round(total_in - total_out, 2), None])
-    return build_workbook("Journal de caisse", ["Date", "Description", "Catégorie", "Référence", "Par", "Entrée", "Sortie"], rows, settings["name"], subtitle)
+    return build_workbook("Journal de caisse", ["Date", "Description", "Catégorie", "Référence", "Par", "Débit (entrée)", "Crédit (sortie)"], rows, settings["name"], subtitle)
 
 
 STATUS_LABELS = {"completed": "Payée", "unpaid": "Non payée", "partial": "Partielle", "cancelled": "Annulée"}

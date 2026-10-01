@@ -37,12 +37,13 @@ import {
   TabsTrigger,
 } from "../components/ui/tabs";
 import { toast } from "sonner";
-import { Search, Receipt, FileText, CreditCard, XCircle, RotateCcw, Banknote, Smartphone, CalendarDays, X, FileSpreadsheet, Printer } from "lucide-react";
+import { Search, Receipt, FileText, CreditCard, XCircle, RotateCcw, Banknote, Smartphone, CalendarDays, X, FileSpreadsheet, Printer, Pencil, Undo2 } from "lucide-react";
 
 const SalesPage = () => {
   const confirm = useConfirm();
   const { can } = useAuth();
   const canCancel = can("can_cancel_invoice");
+  const canEdit = can("can_edit_invoice");
   const [sales, setSales] = useState([]);
   const [unpaidSales, setUnpaidSales] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -225,9 +226,9 @@ const SalesPage = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold font-[Chivo] tracking-tight text-slate-900">
-            Ventes
+            Documents des ventes
           </h1>
-          <p className="text-slate-500 mt-1">Historique et gestion des ventes</p>
+          <p className="text-slate-500 mt-1">Factures, règlements et suivi des ventes</p>
         </div>
         <Link to="/pos">
           <Button className="btn-accent" data-testid="new-sale-btn">
@@ -315,6 +316,20 @@ const SalesPage = () => {
                             >
                               <CreditCard className="w-4 h-4" />
                             </Button>
+                          )}
+                          {canEdit && sale.status === 'active' && (
+                            <Link to={`/pos?edit=${sale.id}`}>
+                              <Button variant="ghost" size="sm" className="text-blue-600" title="Modifier la facture" data-testid={`edit-sale-${sale.id}`}>
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                            </Link>
+                          )}
+                          {canCancel && sale.status !== 'cancelled' && (
+                            <Link to={`/returns/customer?sale=${sale.id}`}>
+                              <Button variant="ghost" size="sm" className="text-orange-600" title="Retour client" data-testid={`return-sale-${sale.id}`}>
+                                <Undo2 className="w-4 h-4" />
+                              </Button>
+                            </Link>
                           )}
                           {canCancel && sale.status !== 'cancelled' && (
                             <Button 

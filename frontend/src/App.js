@@ -26,6 +26,8 @@ import PurchaseDocumentPage from "./pages/PurchaseDocumentPage";
 import InventoryPage from "./pages/InventoryPage";
 import SupplierInvoicePage from "./pages/SupplierInvoicePage";
 import AccountLedgerPage from "./pages/AccountLedgerPage";
+import ReturnsPage from "./pages/ReturnsPage";
+import ReturnDocumentPage from "./pages/ReturnDocumentPage";
 import { SettingsProvider } from "./contexts/SettingsContext";
 import { ConfirmProvider } from "./contexts/ConfirmContext";
 import Layout from "./components/Layout";
@@ -95,6 +97,11 @@ function App() {
               <AccountLedgerPage />
             </ProtectedRoute>
           } />
+          <Route path="/return/:returnId" element={
+            <ProtectedRoute>
+              <ReturnDocumentPage />
+            </ProtectedRoute>
+          } />
           <Route path="/accounts/:type/:id" element={
             <ProtectedRoute module="accounts">
               <StatementPage />
@@ -113,6 +120,8 @@ function App() {
             <Route path="customers" element={<ProtectedRoute module="customers"><CustomersPage /></ProtectedRoute>} />
             <Route path="suppliers" element={<ProtectedRoute module="suppliers"><SuppliersPage /></ProtectedRoute>} />
             <Route path="sales" element={<ProtectedRoute module="sales"><SalesPage /></ProtectedRoute>} />
+            <Route path="returns/customer" element={<ProtectedRoute module="sales"><ReturnsPage type="customer" /></ProtectedRoute>} />
+            <Route path="returns/supplier" element={<ProtectedRoute module="purchases"><ReturnsPage type="supplier" /></ProtectedRoute>} />
             <Route path="pos" element={<ProtectedRoute module="pos"><POSPage /></ProtectedRoute>} />
             <Route path="orders" element={<ProtectedRoute module="purchases"><OrdersPage /></ProtectedRoute>} />
             <Route path="depots" element={<ProtectedRoute module="depots"><DepotsPage /></ProtectedRoute>} />

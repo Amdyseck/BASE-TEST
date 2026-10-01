@@ -6,12 +6,12 @@ import { PaymentBadge } from "../lib/paymentMethods";
 import api from "../lib/api";
 import { Button } from "../components/ui/button";
 import { toast } from "sonner";
-import { X, Receipt, FileText, PlusCircle } from "lucide-react";
+import { X, Receipt, FileText, PlusCircle, Pencil, Undo2 } from "lucide-react";
 
 const InvoicePage = () => {
   const { saleId } = useParams();
   const { settings, logoUrl } = useSettings();
-  const { hasModule } = useAuth();
+  const { hasModule, can } = useAuth();
   const navigate = useNavigate();
   const [sale, setSale] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -109,6 +109,10 @@ const InvoicePage = () => {
             <p className={`${lg ? "text-2xl" : "text-lg"} font-bold font-[Chivo] text-slate-900`}>FACTURE</p>
             <p className={`font-mono ${lg ? "text-lg" : "text-sm"} text-slate-600`} data-testid={lg ? "invoice-number" : undefined}>{sale.invoice_number}</p>
             {copyType && <p className="text-xs text-slate-400 mt-1">Copie: {copyType}</p>}
+            {sale.edited_at && <p className="text-[10px] text-slate-400 mt-1" data-testid={lg ? "invoice-edited-note" : undefined}>Modifiée le {new Date(sale.edited_at).toLocaleDateString("fr-FR")} par {sale.edited_by}</p>}
+            {lg && sale.status === "returned" && (
+              <span className="inline-block mt-2 px-3 py-1 bg-orange-100 text-orange-700 text-sm font-medium rounded-full">RETOUR PARTIEL</span>
+            )}
             {lg && sale.status === "cancelled" && (
               <span className="inline-block mt-2 px-3 py-1 bg-red-100 text-red-700 text-sm font-medium rounded-full">ANNULÉE</span>
             )}
@@ -211,7 +215,23 @@ const InvoicePage = () => {
           <X className="w-4 h-4 mr-2" />
           Fermer
         </Button>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap justify-end">
+          {can("can_edit_invoice") && sale.status === "active" && (
+            <Link to={`/pos?edit=${sale.id}`}>
+              <Button variant="outline" className="rounded-sm text-blue-700 border-blue-300" data-testid="edit-invoice-btn">
+                <Pencil className="w-4 h-4 mr-2" />
+                Modifier
+              </Button>
+            </Link>
+          )}
+          {can("can_cancel_invoice") && sale.status !== "cancelled" && (
+            <Link to={`/returns/customer?sale=${sale.id}`}>
+              <Button variant="outline" className="rounded-sm text-orange-700 border-orange-300" data-testid="return-invoice-btn">
+                <Undo2 className="w-4 h-4 mr-2" />
+                Retour
+              </Button>
+            </Link>
+          )}
           <Link to="/pos">
             <Button variant="outline" className="rounded-sm" data-testid="new-invoice-btn">
               <PlusCircle className="w-4 h-4 mr-2" />

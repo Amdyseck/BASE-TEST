@@ -8,7 +8,7 @@ import requests
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Response, Query, Header
 
 from server import db, get_current_user, effective_permissions, log_audit, JWT_SECRET, JWT_ALGORITHM
-from extra_routes import put_object, get_object, init_storage, APP_NAME
+from extra_routes import put_object_async, get_object_async, init_storage, APP_NAME
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -46,11 +46,11 @@ async def upload_file(entity_type: str = Query(...), entity_id: str = Query(...)
     ext = (file.filename or "").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else ("pdf" if content_type == "application/pdf" else "bin")
     path = f"{APP_NAME}/files/{entity_type}/{entity_id}/{uuid.uuid4()}.{ext}"
     try:
-        result = put_object(path, data, content_type)
+        result = await put_object_async(path, data, content_type)
     except requests.HTTPError as e:
         if e.response is not None and e.response.status_code == 404:
             init_storage(force=True)
-            result = put_object(path, data, content_type)
+            result = await put_object_async(path, data, content_type)
         else:
             logger.error("Upload storage error: %s", e)
             raise HTTPException(status_code=502, detail="Erreur du service de stockage")
@@ -104,11 +104,11 @@ async def file_content(file_id: str, auth: Optional[str] = Query(None), authoriz
         raise HTTPException(status_code=404, detail="Fichier introuvable")
     _check_module(user, doc["entity_type"])
     try:
-        data, ctype = get_object(doc["storage_path"])
+        data, ctype = await get_object_async(doc["storage_path"])
     except requests.HTTPError as e:
         if e.response is not None and e.response.status_code == 404:
             init_storage(force=True)
-            data, ctype = get_object(doc["storage_path"])
+            data, ctype = await get_object_async(doc["storage_path"])
         else:
             raise HTTPException(status_code=502, detail="Erreur du service de stockage")
     disposition = "attachment" if download else "inline"

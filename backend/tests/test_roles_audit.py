@@ -15,7 +15,7 @@ import pytest
 import requests
 from datetime import datetime, timezone, timedelta
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://food-commerce-hub-3.preview.emergentagent.com").rstrip("/") + "/api"
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://wakeur-sales-system.preview.emergentagent.com").rstrip("/") + "/api"
 
 ADMIN = ("admin@wakeur.sn", "admin123")
 GERANT = ("gerant.test@wakeur.sn", "test1234")

@@ -45,7 +45,7 @@ const UsersPage = () => {
   const confirm = useConfirm();
   const { user: currentUser, isAdmin } = useAuth();
   const [isPermDialogOpen, setIsPermDialogOpen] = useState(false);
-  const [permForm, setPermForm] = useState({ modules: [], can_delete: false, can_cancel_invoice: false, can_edit_prices: false, max_discount_percent: 0 });
+  const [permForm, setPermForm] = useState({ modules: [], can_delete: false, can_cancel_invoice: false, can_edit_prices: false, can_edit_invoice: false, max_discount_percent: 0 });
   const roleOptions = ROLE_OPTIONS.filter((r) => isAdmin || r.value !== "admin");
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -151,6 +151,7 @@ const UsersPage = () => {
       can_delete: !!p.can_delete,
       can_cancel_invoice: !!p.can_cancel_invoice,
       can_edit_prices: !!p.can_edit_prices,
+      can_edit_invoice: !!p.can_edit_invoice,
       max_discount_percent: p.max_discount_percent ?? 0,
     });
     setIsPermDialogOpen(true);
@@ -552,7 +553,7 @@ const UsersPage = () => {
             <div>
               <Label className="overline block mb-2">Droits particuliers</Label>
               <div className="space-y-2">
-                {[["can_delete", "Peut supprimer des éléments"], ["can_cancel_invoice", "Peut annuler / retourner une facture"], ["can_edit_prices", "Peut modifier les prix à la facturation"]].map(([k, l]) => (
+                {[["can_delete", "Peut supprimer des éléments"], ["can_cancel_invoice", "Peut annuler / retourner une facture"], ["can_edit_prices", "Peut modifier les prix à la facturation"], ["can_edit_invoice", "Peut modifier une facture déjà validée / imprimée"]].map(([k, l]) => (
                   <label key={k} className="flex items-center gap-2 text-sm cursor-pointer">
                     <Checkbox checked={permForm[k]} onCheckedChange={(v) => setPermForm({ ...permForm, [k]: !!v })} data-testid={`perm-flag-${k}`} />
                     {l}

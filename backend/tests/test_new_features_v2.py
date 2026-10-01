@@ -12,7 +12,7 @@ import time
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://food-commerce-hub-3.preview.emergentagent.com").rstrip("/") + "/api"
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://wakeur-sales-system.preview.emergentagent.com").rstrip("/") + "/api"
 ADMIN_EMAIL = "admin@wakeur.sn"
 ADMIN_PASSWORD = "admin123"
 

@@ -1,0 +1,36 @@
+import sys, requests
+API, TOKEN = sys.argv[1], sys.argv[2]
+h = {"Authorization": f"Bearer {TOKEN}"}
+def stock(pid): return next(x for x in requests.get(f"{API}/api/products", headers=h).json() if x["id"] == pid)["stock"]
+def bal(cid): return requests.get(f"{API}/api/customers/{cid}", headers=h).json()["balance"]
+prods = requests.get(f"{API}/api/products", headers=h).json()
+p = next(x for x in prods if x["stock"] > 10)
+c = requests.get(f"{API}/api/customers", headers=h).json()[0]
+stock0 = p["stock"]; bal0 = bal(c["id"])
+print("product", p["name"], "stock", stock0, "| customer", c["name"], "balance", bal0)
+sale = requests.post(f"{API}/api/sales", headers=h, json={"items":[{"product_id":p["id"],"product_name":p["name"],"quantity":2,"unit_price":p["price"],"total":2*p["price"]}],"customer_id":c["id"],"customer_name":c["name"],"payment_method":"especes","amount_paid":p["price"],"discount":0}).json()
+print("sale", sale["invoice_number"], "total", sale["total"], "due", sale["balance_due"])
+e = requests.put(f"{API}/api/sales/{sale['id']}", headers=h, json={"items":[{"product_id":p["id"],"product_name":p["name"],"quantity":3.5,"unit_price":p["price"],"total":3.5*p["price"]}],"customer_id":c["id"],"discount":0})
+print("edit", e.status_code, e.json().get("total"), e.json().get("balance_due"), e.json().get("detail"))
+st = stock(p["id"]); cb = bal(c["id"])
+print("after edit: stock", st, "(expected", stock0-3.5, ") balance", cb, "(expected", round(bal0 + 2.5*p["price"],2), ")")
+r = requests.post(f"{API}/api/returns", headers=h, json={"type":"customer","source_type":"sale","source_id":sale["id"],"items":[{"product_id":p["id"],"product_name":p["name"],"quantity":1,"unit_price":p["price"],"total":p["price"]}],"refund_mode":"avance","reason":"test"})
+print("return", r.status_code, {k:r.json().get(k) for k in ("number","total","applied_on_source","refund_cash","kept_as_advance","detail")})
+st2 = stock(p["id"]); cb2 = bal(c["id"])
+s2 = requests.get(f"{API}/api/sales/{sale['id']}", headers=h).json()
+print("after return: stock", st2, "(expected", stock0-2.5, ") balance", cb2, "(expected", round(cb - p["price"],2), ") sale due", s2["balance_due"], "status", s2["status"])
+r2 = requests.post(f"{API}/api/returns", headers=h, json={"type":"customer","source_type":"sale","source_id":sale["id"],"items":[{"product_id":p["id"],"product_name":p["name"],"quantity":5,"unit_price":p["price"],"total":5*p["price"]}],"refund_mode":"especes"})
+print("over-return", r2.status_code, r2.json().get("detail"))
+sups = requests.get(f"{API}/api/suppliers", headers=h).json()
+r3 = requests.post(f"{API}/api/returns", headers=h, json={"type":"supplier","entity_id":sups[0]["id"],"items":[{"product_id":p["id"],"product_name":p["name"],"quantity":1,"unit_price":p.get("cost",0) or 100,"total":p.get("cost",0) or 100}],"refund_mode":"especes","reason":"abîmé"})
+print("supplier return", r3.status_code, {k:r3.json().get(k) for k in ("number","total","refund_cash","detail")})
+print("stock after supplier return", stock(p["id"]), "(expected", st2-1, ")")
+print("returns list", len(requests.get(f"{API}/api/returns", headers=h).json()))
+stmt = requests.get(f"{API}/api/accounts/customer/{c['id']}/statement", headers=h)
+print("statement", stmt.status_code, [l["label"] for l in stmt.json().get("lines", [])][-3:] if stmt.ok else stmt.text[:100])
+mv = requests.get(f"{API}/api/cash/movements", headers=h)
+print("cash movements", mv.status_code, [ (m["type"], m["amount"], m["description"]) for m in (mv.json().get("movements", mv.json()) if mv.ok and isinstance(mv.json(), (list, dict)) else [])][:2] if mv.ok else mv.text[:80])
+vt = requests.post(f"{API}/api/auth/login", json={"email":"vendeur.test@wakeur.sn","password":"test1234"}).json()
+vtok = vt.get("token") or vt.get("access_token")
+ve = requests.put(f"{API}/api/sales/{sale['id']}", headers={"Authorization": f"Bearer {vtok}"}, json={"items":[{"product_id":p["id"],"product_name":p["name"],"quantity":1,"unit_price":p["price"],"total":p["price"]}],"customer_id":c["id"],"discount":0})
+print("vendeur edit ->", ve.status_code)

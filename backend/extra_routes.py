@@ -1,5 +1,6 @@
 import os
 import uuid
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Optional, List
@@ -42,14 +43,33 @@ def put_object(path: str, data: bytes, content_type: str) -> dict:
     return resp.json()
 
 
+_object_cache: dict = {}
+_OBJECT_CACHE_MAX = 64 * 1024 * 1024
+
+
 def get_object(path: str):
+    cached = _object_cache.get(path)
+    if cached:
+        return cached
     key = init_storage()
     resp = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60)
     if resp.status_code == 404:
         key = init_storage(force=True)
         resp = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60)
     resp.raise_for_status()
-    return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
+    result = (resp.content, resp.headers.get("Content-Type", "application/octet-stream"))
+    if sum(len(v[0]) for v in _object_cache.values()) + len(result[0]) > _OBJECT_CACHE_MAX:
+        _object_cache.clear()
+    _object_cache[path] = result
+    return result
+
+
+async def get_object_async(path: str):
+    return await asyncio.to_thread(get_object, path)
+
+
+async def put_object_async(path: str, data: bytes, content_type: str) -> dict:
+    return await asyncio.to_thread(put_object, path, data, content_type)
 
 
 # ==================== COMPANY SETTINGS ====================
@@ -133,7 +153,7 @@ async def upload_logo(file: UploadFile = File(...), user: dict = Depends(require
     ext = (file.filename or "logo").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else "png"
     path = f"{APP_NAME}/settings/logo-{uuid.uuid4()}.{ext}"
     try:
-        result = put_object(path, data, file.content_type)
+        result = await put_object_async(path, data, file.content_type)
     except Exception as e:
         logger.error(f"Logo upload failed: {e}")
         raise HTTPException(status_code=502, detail="Échec du téléversement du logo")
@@ -152,7 +172,7 @@ async def get_logo():
     if not s.get("logo_path"):
         raise HTTPException(status_code=404, detail="Aucun logo")
     try:
-        data, ct = get_object(s["logo_path"])
+        data, ct = await get_object_async(s["logo_path"])
     except Exception as e:
         logger.error(f"Logo download failed: {e}")
         raise HTTPException(status_code=502, detail="Logo indisponible")
@@ -214,6 +234,12 @@ async def account_statement(entity_type: str, entity_id: str, user: dict = Depen
             lines.append({"date": _dt(p["created_at"]), "label": label, "reference": p.get("reference", "") or ", ".join(a.get("reference", "") for a in p.get("allocations", [])), "debit": 0, "credit": 0 if use else p["amount"], "info_amount": p["amount"] if use else None, "type": "payment", "payment_method": p.get("payment_method")})
     else:
         raise HTTPException(status_code=400, detail="Type de tiers invalide")
+
+    returns = await db.returns.find({"type": entity_type, "entity_id": entity_id}, {"_id": 0}).to_list(10000)
+    for r in returns:
+        lines.append({"date": _dt(r["created_at"]), "label": f"Retour {'client' if entity_type == 'customer' else 'fournisseur'} (avoir)", "reference": r["number"], "debit": 0, "credit": r["total"], "type": "return", "source_id": r["id"]})
+        if r.get("refund_cash", 0) > 0:
+            lines.append({"date": _dt(r["created_at"]), "label": "Remboursement espèces du retour", "reference": r["number"], "debit": r["refund_cash"], "credit": 0, "type": "refund", "payment_method": "especes"})
 
     lines.sort(key=lambda line: (line["date"], 0 if line["type"] == "invoice" else 1))
     running = 0

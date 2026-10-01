@@ -26,6 +26,7 @@ import {
   KeyRound,
   ClipboardCheck,
   ChevronDown,
+  Undo2,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import {
@@ -53,11 +54,13 @@ const Layout = () => {
   const groups = [
     { key: "vente", label: "VENTE", icon: ShoppingCart, items: [
       { to: "/pos", icon: ShoppingCart, label: "Nouvelle vente", module: "pos" },
-      { to: "/sales", icon: Receipt, label: "Historique ventes", module: "sales" },
+      { to: "/sales", icon: Receipt, label: "Documents des ventes", module: "sales" },
+      { to: "/returns/customer", icon: Undo2, label: "Retours clients", module: "sales" },
       { to: "/customers", icon: Users, label: "Clients", module: "customers" },
     ] },
     { key: "achat", label: "ACHAT", icon: ClipboardList, items: [
       { to: "/orders", icon: ClipboardList, label: "Achats", module: "purchases" },
+      { to: "/returns/supplier", icon: Undo2, label: "Retours fournisseurs", module: "purchases" },
       { to: "/suppliers", icon: Truck, label: "Fournisseurs", module: "suppliers" },
     ] },
     { key: "caisse", label: "CAISSE", icon: Banknote, to: "/cash", module: "cash" },
@@ -139,7 +142,7 @@ const Layout = () => {
                       end
                       onClick={() => setSidebarOpen(false)}
                       className={({ isActive }) => `sidebar-nav-item sidebar-sub-item ${isActive ? "active" : ""}`}
-                      data-testid={`nav-${item.to.slice(1)}`}
+                      data-testid={`nav-${item.to.slice(1).replace(/\//g, "-")}`}
                     >
                       <item.icon size={15} />
                       <span className="text-sm">{item.label}</span>

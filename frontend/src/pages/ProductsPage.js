@@ -102,8 +102,8 @@ const ProductsPage = () => {
         ...formData,
         price: parseFloat(formData.price),
         cost_price: parseFloat(formData.cost_price),
-        stock: parseInt(formData.stock),
-        min_stock: parseInt(formData.min_stock),
+        stock: parseFloat(String(formData.stock).replace(",", ".")) || 0,
+        min_stock: parseFloat(String(formData.min_stock).replace(",", ".")) || 0,
       };
 
       if (editingProduct) {
@@ -342,6 +342,7 @@ const ProductsPage = () => {
                     <Label className="overline">Stock actuel</Label>
                     <Input
                       type="number"
+                      step="0.5"
                       value={formData.stock}
                       onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
                       required

@@ -91,8 +91,8 @@ class ProductBase(BaseModel):
     depot_id: Optional[str] = ""
     price: float
     cost_price: float
-    stock: int = 0
-    min_stock: int = 5
+    stock: float = 0
+    min_stock: float = 5
     description: Optional[str] = ""
     unit: str = "kg"
 
@@ -175,6 +175,10 @@ class Sale(SaleBase):
     is_paid: bool = False  # Facture entièrement payée
     cashier_id: str = ""
     cashier_name: str = ""
+    edited_at: Optional[str] = None
+    edited_by: Optional[str] = None
+    edit_count: int = 0
+    returns_total: float = 0
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class OrderItem(BaseModel):
@@ -323,13 +327,13 @@ def require_role(allowed_roles: List[str]):
 
 ROLES = ["admin", "gerant", "vendeur", "caissier"]
 ALL_MODULES = ["pos", "sales", "products", "categories", "purchases", "customers", "suppliers", "accounts", "cash", "bank", "depots", "reports", "users", "audit", "settings"]
-PERMISSION_FLAGS = ["can_delete", "can_cancel_invoice", "can_edit_prices"]
+PERMISSION_FLAGS = ["can_delete", "can_cancel_invoice", "can_edit_prices", "can_edit_invoice"]
 
 ROLE_DEFAULTS = {
-    "admin": {"modules": ALL_MODULES, "can_delete": True, "can_cancel_invoice": True, "can_edit_prices": True, "max_discount_percent": 100},
-    "gerant": {"modules": [m for m in ALL_MODULES if m != "settings"], "can_delete": True, "can_cancel_invoice": True, "can_edit_prices": True, "max_discount_percent": 100},
-    "vendeur": {"modules": ["pos", "sales", "products", "categories", "customers", "depots", "reports"], "can_delete": False, "can_cancel_invoice": False, "can_edit_prices": False, "max_discount_percent": 5},
-    "caissier": {"modules": ["sales", "accounts", "cash", "bank", "customers", "suppliers"], "can_delete": False, "can_cancel_invoice": False, "can_edit_prices": False, "max_discount_percent": 0},
+    "admin": {"modules": ALL_MODULES, "can_delete": True, "can_cancel_invoice": True, "can_edit_prices": True, "can_edit_invoice": True, "max_discount_percent": 100},
+    "gerant": {"modules": [m for m in ALL_MODULES if m != "settings"], "can_delete": True, "can_cancel_invoice": True, "can_edit_prices": True, "can_edit_invoice": True, "max_discount_percent": 100},
+    "vendeur": {"modules": ["pos", "sales", "products", "categories", "customers", "depots", "reports"], "can_delete": False, "can_cancel_invoice": False, "can_edit_prices": False, "can_edit_invoice": False, "max_discount_percent": 5},
+    "caissier": {"modules": ["sales", "accounts", "cash", "bank", "customers", "suppliers"], "can_delete": False, "can_cancel_invoice": False, "can_edit_prices": False, "can_edit_invoice": False, "max_discount_percent": 0},
 }
 
 def effective_permissions(user: dict) -> dict:
@@ -338,7 +342,7 @@ def effective_permissions(user: dict) -> dict:
         return dict(ROLE_DEFAULTS["admin"])
     base = dict(ROLE_DEFAULTS.get(role, ROLE_DEFAULTS["vendeur"]))
     custom = user.get("permissions") or {}
-    for key in ["modules", "can_delete", "can_cancel_invoice", "can_edit_prices", "max_discount_percent"]:
+    for key in ["modules", "can_delete", "can_cancel_invoice", "can_edit_prices", "can_edit_invoice", "max_discount_percent"]:
         if key in custom and custom[key] is not None:
             base[key] = custom[key]
     if role == "caissier":
@@ -475,6 +479,7 @@ async def update_user(user_id: str, user_data: UserUpdate, user: dict = Depends(
             "can_delete": bool(perms.get("can_delete", False)),
             "can_cancel_invoice": bool(perms.get("can_cancel_invoice", False)),
             "can_edit_prices": bool(perms.get("can_edit_prices", False)),
+            "can_edit_invoice": bool(perms.get("can_edit_invoice", False)),
             "max_discount_percent": max(0, min(100, float(perms.get("max_discount_percent", 0) or 0))),
         }
     
@@ -685,7 +690,7 @@ async def update_product(product_id: str, product_data: ProductUpdate, user: dic
     return Product(**updated)
 
 @api_router.put("/products/{product_id}/stock")
-async def update_product_stock(product_id: str, stock: int, user: dict = Depends(require_module("products"))):
+async def update_product_stock(product_id: str, stock: float, user: dict = Depends(require_module("products"))):
     """Update real stock (for inventory)"""
     before = await db.products.find_one({"id": product_id}, {"_id": 0, "name": 1, "stock": 1})
     if before:
@@ -1784,10 +1789,12 @@ def _include_extra_routes():
     from export_routes import router as export_router
     from ledger_backup_routes import router as ledger_router
     from files_routes import router as files_router
+    from returns_routes import router as returns_router
     api_router.include_router(extra_router)
     api_router.include_router(export_router)
     api_router.include_router(ledger_router)
     api_router.include_router(files_router)
+    api_router.include_router(returns_router)
 
 _include_extra_routes()
 app.include_router(api_router)
