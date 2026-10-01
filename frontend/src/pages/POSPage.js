@@ -41,8 +41,11 @@ const POSPage = () => {
   const maxDiscountPct = user?.role === "admin" ? 100 : permissions.max_discount_percent ?? 0;
   const barcodeInputRef = useRef(null);
   const pickerRef = useRef(null);
+  const listRef = useRef(null);
+  const linesRef = useRef(null);
   const qtyRefs = useRef({});
   const priceRefs = useRef({});
+  const [listIndex, setListIndex] = useState(0);
   const [focusTarget, setFocusTarget] = useState(null);
   const [showPanel, setShowPanel] = useState(() => localStorage.getItem("pos_show_panel") !== "0");
   const [products, setProducts] = useState([]);
@@ -100,30 +103,31 @@ const POSPage = () => {
     const el = focusTarget.field === "qty" ? qtyRefs.current[focusTarget.id] : focusTarget.field === "price" ? priceRefs.current[focusTarget.id] : null;
     if (el) { el.focus(); el.select(); }
     else if (focusTarget.field === "picker") pickerRef.current?.focus();
+    else if (focusTarget.field === "list") listRef.current?.focus();
     setFocusTarget(null);
   }, [focusTarget, cart]);
 
-  const togglePanel = useCallback(() => {
-    setShowPanel((v) => {
-      const next = !v;
-      if (next) setTimeout(() => barcodeInputRef.current?.focus(), 50);
-      else setTimeout(() => pickerRef.current?.focus(), 50);
-      return next;
-    });
-  }, []);
+  useEffect(() => {
+    if (linesRef.current) linesRef.current.scrollTop = linesRef.current.scrollHeight;
+  }, [cart.length]);
+
+  useEffect(() => { setListIndex(0); }, [searchTerm]);
+  useEffect(() => { listRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" }); }, [listIndex]);
+
+  const focusList = useCallback(() => {
+    if (!showPanel) setShowPanel(true);
+    setFocusTarget({ field: "list" });
+  }, [showPanel]);
+
+  const togglePanel = useCallback(() => setShowPanel((v) => !v), []);
 
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === "F4") {
-        e.preventDefault();
-        if (!showPanel) togglePanel();
-        else if (document.activeElement === barcodeInputRef.current) togglePanel();
-        else barcodeInputRef.current?.focus();
-      }
+      if (e.key === "F4") { e.preventDefault(); focusList(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [showPanel, togglePanel]);
+  }, [focusList]);
 
   const handleBarcodeSubmit = async (e) => {
     e.preventDefault();
@@ -149,7 +153,15 @@ const POSPage = () => {
     } else {
       setCart([...cart, { product_id: product.id, product_name: product.name, sku: product.sku, quantity: 1, qty_raw: "1", unit_price: product.price, price_raw: String(product.price), base_price: product.price, total: product.price, max_stock: product.stock, unit: product.unit }]);
     }
-    if (focusQty) setFocusTarget({ id: product.id, field: "qty" });
+    if (focusQty) { setSearchTerm(""); setFocusTarget({ id: product.id, field: "qty" }); }
+  };
+
+  const onListKeyDown = (e) => {
+    const list = filteredProducts.slice(0, 100);
+    if (e.key === "ArrowDown") { e.preventDefault(); setListIndex((i) => Math.min(i + 1, list.length - 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setListIndex((i) => Math.max(i - 1, 0)); }
+    else if (e.key === "Enter") { e.preventDefault(); if (list[listIndex]) addToCart(list[listIndex], true); }
+    else if (e.key === "Escape") { e.preventDefault(); setFocusTarget({ field: "picker" }); }
   };
 
   const updateItem = (productId, changes) => {
@@ -271,7 +283,7 @@ const POSPage = () => {
           <h1 className="text-2xl font-bold font-[Chivo] tracking-tight text-slate-900 flex items-center gap-2">
             {editing ? <><Pencil className="w-5 h-5 text-blue-700" /> MODIFICATION DE LA FACTURE <span className="font-mono text-blue-700">{editing.invoice_number}</span></> : "VENTE"}
           </h1>
-          <p className="text-slate-500 mt-1 text-sm">{editing ? "Modifiez les lignes, le client ou la remise — les règlements déjà encaissés sont conservés." : "Saisissez les articles directement sur la facture (Entrée pour ajouter, Tab pour passer de colonne en colonne, F4 pour le volet Articles)."}</p>
+          <p className="text-slate-500 mt-1 text-sm">{editing ? "Modifiez les lignes, le client ou la remise — les règlements déjà encaissés sont conservés." : "Saisissez l'article sur la facture (Entrée pour ajouter) ou Tab / F4 pour aller à la liste des articles, Entrée pour choisir, puis Tab vers Qté et P.U."}</p>
         </div>
         <div className="flex items-center gap-2">
           {cashSession === null && (
@@ -284,16 +296,16 @@ const POSPage = () => {
               <span className="w-2 h-2 rounded-full bg-green-500" /> Caisse ouverte
             </span>
           )}
-          <Button variant="outline" className="rounded-sm bg-white" onClick={togglePanel} title="F4" data-testid="toggle-articles-panel-btn">
-            {showPanel ? <PanelRightClose className="w-4 h-4 mr-2" /> : <PanelRightOpen className="w-4 h-4 mr-2" />} {showPanel ? "Masquer les articles" : "Afficher les articles"} <kbd className="ml-2 text-[10px] px-1 py-0.5 border border-slate-300 rounded bg-slate-50 font-mono">F4</kbd>
+          <Button variant="outline" className="rounded-sm bg-white" onClick={togglePanel} data-testid="toggle-articles-panel-btn">
+            {showPanel ? <PanelRightClose className="w-4 h-4 mr-2" /> : <PanelRightOpen className="w-4 h-4 mr-2" />} {showPanel ? "Masquer les articles" : "Afficher les articles"}
           </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
         {/* FACTURE */}
-        <div className={showPanel ? "xl:col-span-8" : "xl:col-span-12"}>
-          <Card className="bg-slate-100 border border-slate-300 rounded-sm shadow-sm">
+        <div className={`${showPanel ? "xl:col-span-8" : "xl:col-span-12"} xl:sticky xl:top-4 xl:self-start`}>
+          <Card className="bg-slate-100 border border-slate-300 rounded-sm shadow-lg">
             <CardHeader className="border-b border-slate-300 pb-3 bg-slate-100">
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
                 <div className="lg:col-span-5">
@@ -328,7 +340,7 @@ const POSPage = () => {
             </CardHeader>
 
             <CardContent className="p-0">
-              <div className="max-h-[440px] overflow-y-auto bg-white">
+              <div ref={linesRef} className="max-h-[360px] overflow-y-auto bg-white">
                 <table className="w-full text-sm" data-testid="invoice-lines-table">
                   <thead className="bg-slate-200 text-[11px] uppercase tracking-wide text-slate-600 sticky top-0">
                     <tr>
@@ -385,10 +397,10 @@ const POSPage = () => {
                         </td>
                       </tr>
                     ))}
-                    <tr className="bg-green-50/40">
+                    <tr className="bg-green-50 sticky bottom-0 border-t border-green-200">
                       <td className="px-3 py-2 text-slate-400 font-mono text-xs">{cart.length + 1}</td>
                       <td colSpan={5} className="px-3 py-2">
-                        <ProductPicker ref={pickerRef} products={products} onPick={(p) => addToCart(p, true)} />
+                        <ProductPicker ref={pickerRef} products={products} value={searchTerm} onChange={setSearchTerm} onPick={(p) => addToCart(p, true)} onTab={focusList} />
                       </td>
                     </tr>
                     {cart.length === 0 && (
@@ -496,13 +508,22 @@ const POSPage = () => {
                 </form>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <Input placeholder="Rechercher un article..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 rounded-sm h-9" data-testid="search-pos-products" />
+                  <Input placeholder="Rechercher un article..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onKeyDown={(e) => { if (e.key === "ArrowDown" || e.key === "Enter") { e.preventDefault(); focusList(); } }} className="pl-9 rounded-sm h-9" data-testid="search-pos-products" />
                 </div>
+                <p className="text-[11px] text-slate-400">↑ ↓ pour choisir · Entrée ou OK pour ajouter · <kbd className="px-1 border border-slate-300 rounded bg-slate-50 font-mono">F4</kbd> / Tab depuis la facture pour venir ici</p>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="max-h-[640px] overflow-y-auto divide-y divide-slate-100">
-                  {filteredProducts.slice(0, 100).map((product) => (
-                    <button key={product.id} onClick={() => addToCart(product)} disabled={product.stock <= 0} className="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left hover:bg-green-50/60 transition-colors disabled:opacity-40 disabled:cursor-not-allowed" data-testid={`pos-product-${product.id}`}>
+                <div ref={listRef} tabIndex={0} role="listbox" onKeyDown={onListKeyDown} className="max-h-[640px] overflow-y-auto divide-y divide-slate-100 outline-none focus:ring-2 focus:ring-green-500 focus:ring-inset" data-testid="pos-products-list">
+                  {filteredProducts.slice(0, 100).map((product, i) => (
+                    <div
+                      key={product.id}
+                      role="option"
+                      aria-selected={i === listIndex}
+                      onClick={() => { setListIndex(i); if (product.stock > 0) addToCart(product, true); }}
+                      onMouseEnter={() => setListIndex(i)}
+                      className={`w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors cursor-pointer ${i === listIndex ? "bg-green-100" : "hover:bg-green-50/60"} ${product.stock <= 0 ? "opacity-40 cursor-not-allowed" : ""}`}
+                      data-testid={`pos-product-${product.id}`}
+                    >
                       <div className="min-w-0 flex items-center gap-2">
                         <ProductThumb product={product} size="w-9 h-9" />
                         <div className="min-w-0">
@@ -510,11 +531,16 @@ const POSPage = () => {
                           <p className="text-[11px] text-slate-400 font-mono">{product.sku}</p>
                         </div>
                       </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="font-mono font-medium text-slate-900 text-sm">{formatCurrency(product.price)}</p>
-                        <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-mono ${product.stock <= 0 ? "bg-red-100 text-red-700" : product.stock <= product.min_stock ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700"}`}>{product.stock} {product.unit}</span>
+                      <div className="text-right flex-shrink-0 flex items-center gap-2">
+                        <div>
+                          <p className="font-mono font-medium text-slate-900 text-sm">{formatCurrency(product.price)}</p>
+                          <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-mono ${product.stock <= 0 ? "bg-red-100 text-red-700" : product.stock <= product.min_stock ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700"}`}>{product.stock} {product.unit}</span>
+                        </div>
+                        {i === listIndex && product.stock > 0 && (
+                          <Button size="sm" tabIndex={-1} className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={(e) => { e.stopPropagation(); addToCart(product, true); }} data-testid={`pos-product-ok-${product.id}`}>OK</Button>
+                        )}
                       </div>
-                    </button>
+                    </div>
                   ))}
                   {filteredProducts.length === 0 && <p className="text-center py-10 text-slate-400 text-sm">Aucun article trouvé</p>}
                 </div>

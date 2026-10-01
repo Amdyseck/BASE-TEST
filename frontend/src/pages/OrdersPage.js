@@ -306,7 +306,7 @@ const OrdersPage = () => {
   }
 
   return (
-    <div className="space-y-6" data-testid="orders-page">
+    <div className="-m-6 lg:-m-8 p-6 lg:p-8 min-h-screen bg-slate-200/60 space-y-6" data-testid="orders-page">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold font-[Chivo] tracking-tight text-slate-900">
