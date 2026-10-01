@@ -1,0 +1,46 @@
+{
+  "summary": "Iteration 8 testing complete. Backend 19 passed / 1 skipped (test_iter8_edit_returns.py) covering PUT /api/sales/{id} (admin ok with decimal 3.5, vendeur 403, cancelled 400, returned 400), POST /api/returns customer/supplier flows (RTC/RTF numbering, stock regeneration, applied_on_source, refund_cash via cash_movements, kept_as_advance, qty>sold -> 400, direct avance w/o entity -> 400, direct especes OK, supplier insufficient stock -> 400, supplier w/o entity -> 400), GET /api/returns filters by type, GET /api/returns/{id} returns {return, entity}, vendeur 403 on customer return, account statement contains 'Retour client' lines, products support decimal stock. Audit log route is /api/audit-logs (not /api/audit). Frontend verified end-to-end as admin: sidebar labels 'Documents des ventes', 'Retours clients' (nav-returns-customer), 'Retours fournisseurs' (nav-returns-supplier); /sales title 'Documents des ventes'; POS reorganized header (select-customer / invoice-date / checkout-btn 'Valider' / cancel-invoice-btn / clear-cart-btn), payment-section below items (payment-especes/wave/om/cheque/banque/non-paye, input-discount, input-amount-paid, exact-amount-btn, pos-total); direct entry invoice-product-picker -> product-picker-list -> Enter adds line, focus to qty-input-<id>, type '1,5' decimal accepted, Tab -> price-input-<id>, Tab -> back to invoice-product-picker; toggle-articles-panel-btn hides/shows articles-panel; F4 shows panel and focuses barcode-input; checkout with especes exact-amount redirects to /invoice/:id with 1,5 qty rendered. Edit flow: edit-sale-<id> on /sales -> /pos?edit=<id>, edit-mode-notice visible, checkout-btn label becomes 'Enregistrer', save redirects to /invoice/:id with invoice-edited-note; edit-invoice-btn + return-invoice-btn visible on /invoice/:id for admin. Returns dialogs open with correct testids (new-return-dialog, return-source-select, return-entity-select, return-product-search, refund-especes-btn). Cash page tab-movements shows Débit/Crédit columns and 'Débit (entrées)' / 'Crédit (sorties)' cards; 58 movement-debit + 58 movement-credit rows. Attachments: 9/9 images loaded (naturalWidth>0) within 6s on first attachments-btn.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "passed_tests": [
+    "BACKEND GET /api/auth/me admin.permissions.can_edit_invoice=true; vendeur=false",
+    "BACKEND PUT /api/sales/{id} admin: qty 2 -> 3.5 decimal; subtotal/total/balance_due recomputed; stock -1.5 extra; customer balance adjusted; edited_at/edited_by/edit_count returned; audit-logs module=sales action=update entry present",
+    "BACKEND PUT /api/sales/{id} vendeur -> 403; cancelled sale -> 400; sale with returns_total>0 (status returned) -> 400",
+    "BACKEND POST /api/returns customer source=sale: RTC0000xxx; stock +qty; applied_on_source reduces sale balance_due; sale.status='returned'",
+    "BACKEND POST /api/returns qty>sold -> 400",
+    "BACKEND POST /api/returns direct customer refund_mode=avance without entity -> 400; with entity OK; refund_mode=especes without entity OK with refund_cash>0 and cash out",
+    "BACKEND POST /api/returns supplier direct refund_mode=especes: RTF0000xxx, stock -qty, cash in; insufficient stock -> 400; without entity -> 400",
+    "BACKEND GET /api/returns?type=customer/supplier filter correctly; GET /api/returns/{id} returns {return,entity}; vendeur without can_cancel_invoice -> 403",
+    "BACKEND GET /api/accounts/customer/{id}/statement contains 'Retour client' line after return",
+    "BACKEND GET /api/products returns product with decimal stock without error",
+    "FRONTEND sidebar labels and nav-testids correct (nav-sales 'Documents des ventes', nav-returns-customer, nav-returns-supplier)",
+    "FRONTEND POS header + payment-section layout + all testids (select-customer, invoice-date, checkout-btn, cancel-invoice-btn, clear-cart-btn, payment-especes, input-discount, input-amount-paid, exact-amount-btn, pos-total)",
+    "FRONTEND POS direct entry: invoice-product-picker 'pomme' -> product-picker-list visible; Enter adds line, focus qty-input-<id>; '1,5' accepted; Tab->price-input-<id>; Tab->invoice-product-picker",
+    "FRONTEND POS toggle-articles-panel-btn hides/shows articles-panel; F4 shows panel and focuses barcode-input",
+    "FRONTEND POS checkout especes exact -> /invoice/:id with qty 1,5",
+    "FRONTEND /sales edit-sale-<id> -> /pos?edit=<id> with edit-mode-notice; checkout-btn label 'Enregistrer'; save -> /invoice/:id with invoice-edited-note; edit-invoice-btn + return-invoice-btn visible",
+    "FRONTEND /returns/customer new-return-btn opens new-return-dialog with return-source-select; /returns/supplier dialog has return-entity-select, return-product-search, refund-especes-btn",
+    "FRONTEND /cash tab-movements shows 'Débit'/'Crédit' columns, cards 'Débit (entrées)' / 'Crédit (sorties)'; 58 movement-debit + 58 movement-credit rows",
+    "FRONTEND /products attachments-btn -> dialog loads 9/9 attachment-preview images with naturalWidth>0 within 6s (threadpool+cache working)"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_iter8_edit_returns.py",
+    "/app/test_reports/pytest/iter8.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "returns_routes.edit_sale correctly guards cancelled/returned invoices, re-computes subtotal/total with discount, enforces max_discount_percent and can_edit_prices, adjusts product stock using old/new quantity deltas (per product), and reconciles customer balance by first reverting old sale impact then applying new one. Audit entry via log_audit covers before/after client/total/remise/articles.",
+    "edit_sale uses sale['_id']=0 projection but response is returned directly (not response_model=Sale), fine. However if GET /api/sales/{id} is response_model=Sale, newly added fields (edited_at/edited_by/edit_count/returns_total) must be in Sale model - verified present in server.py (~line 167-181).",
+    "create_return performs stock +qty (customer) or -qty (supplier) BEFORE issuing the return number via next_sequence; if next_sequence or any downstream step fails, stock change wouldn't rollback. Low-risk here (no transactions) but worth noting as atomicity caveat.",
+    "create_return applies applied_on_source to source.balance_due and sets sale.status='returned'; combined with edit_sale's refusal to edit returned invoices, this correctly prevents double-counting.",
+    "Audit list endpoint is /api/audit-logs (not /api/audit) - documentation note for future testers.",
+    "server.py is still >1700 lines; consider extracting sales/returns/orders routers (tracked carry-over from iter6/7)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter8_edit_returns.py"],
+  "success_rate": {"backend": "100% (19/19 passed, 1 skipped - no files to perf-test)", "frontend": "100% (all iter8 flows verified admin)"},
+  "test_credentials": "admin@wakeur.sn/admin123, vendeur.test@wakeur.sn/test1234 (unchanged)",
+  "seed_data_creation": "Created ~5 new sales (edit/return tests), 5+ returns (RTC/RTF), stock on 'Pomme de terre (sac 25kg)' now ~1284.5 after the tests. No destructive changes.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Regression file: /app/backend/tests/test_iter8_edit_returns.py. Note: /api/audit-logs (not /api/audit). Login response field is 'access_token' not 'token'. GET /api/files requires entity_type+entity_id query params, so the parallel file perf test is skipped unless specific IDs are seeded; manual attachment preview check on /products confirmed get_object_async threadpool+cache is working (9 images loaded <6s)."
+}
