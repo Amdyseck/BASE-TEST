@@ -9,10 +9,13 @@ import { Label } from "../components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { toast } from "sonner";
-import { Search, Trash2, Receipt, Barcode, Banknote, Smartphone, CreditCard, Lock, FileText, PackageSearch, Ban, PiggyBank, ShieldAlert, PanelRightClose, PanelRightOpen, Eraser, XCircle, Pencil } from "lucide-react";
+import { Search, Trash2, Receipt, Barcode, Banknote, Smartphone, CreditCard, Lock, FileText, PackageSearch, Ban, PiggyBank, ShieldAlert, PanelRightClose, PanelRightOpen, Eraser, XCircle, Pencil, SlidersHorizontal } from "lucide-react";
 import { ManagerAuthDialog } from "../components/ManagerAuthDialog";
 import { ProductThumb } from "../components/Attachments";
 import { ProductPicker } from "../components/ProductPicker";
+import { InvoiceUiCustomizer } from "../components/InvoiceUiCustomizer";
+import { useInvoiceUi } from "../hooks/useInvoiceUi";
+import { makeMoney, makeDate, FONT_CLASSES, BG_CLASSES } from "../lib/invoiceUi";
 
 const formatCurrency = (amount) =>
   new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", minimumFractionDigits: 0 }).format(amount || 0);
@@ -33,7 +36,11 @@ const POSPage = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const editId = params.get("edit");
-  const { user, can, permissions, isManager } = useAuth();
+  const { user, can, permissions, isManager, isAdmin } = useAuth();
+  const { ui, loaded: uiLoaded, update: updateUi, save: saveUi, reset: resetUi, revert: revertUi } = useInvoiceUi();
+  const [customizeOpen, setCustomizeOpen] = useState(false);
+  const containerRef = useRef(null);
+  const [dragging, setDragging] = useState(false);
   const [overdue, setOverdue] = useState(null);
   const [authOpen, setAuthOpen] = useState(false);
 
@@ -47,7 +54,25 @@ const POSPage = () => {
   const priceRefs = useRef({});
   const [listIndex, setListIndex] = useState(0);
   const [focusTarget, setFocusTarget] = useState(null);
-  const [showPanel, setShowPanel] = useState(() => localStorage.getItem("pos_show_panel") === "1");
+  const [showPanel, setShowPanel] = useState(() => sessionStorage.getItem("pos_show_panel") === "1");
+  const panelInit = useRef(false);
+  useEffect(() => {
+    if (uiLoaded && !panelInit.current) { panelInit.current = true; if (sessionStorage.getItem("pos_show_panel") === null) setShowPanel(ui.panel.defaultVisible); }
+  }, [uiLoaded, ui.panel.defaultVisible]);
+
+  const startDrag = (e) => {
+    e.preventDefault();
+    setDragging(true);
+    const rect = containerRef.current.getBoundingClientRect();
+    const left = ui.panel.side === "left";
+    const onMove = (ev) => {
+      const pct = left ? ((ev.clientX - rect.left) / rect.width) * 100 : ((rect.right - ev.clientX) / rect.width) * 100;
+      updateUi((u) => ({ ...u, panel: { ...u.panel, width: Math.round(Math.min(55, Math.max(20, pct))) } }));
+    };
+    const onUp = () => { setDragging(false); window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); setTimeout(() => saveUi(), 0); };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
   const [invoiceDate, setInvoiceDate] = useState(() => toInputDate(new Date()));
   const [poRef, setPoRef] = useState("");
   const [products, setProducts] = useState([]);
@@ -69,7 +94,6 @@ const POSPage = () => {
     // eslint-disable-next-line
   }, [editId]);
 
-  useEffect(() => { localStorage.setItem("pos_show_panel", showPanel ? "1" : "0"); }, [showPanel]);
 
   const fetchData = async () => {
     try {
@@ -123,7 +147,7 @@ const POSPage = () => {
     setFocusTarget({ field: "list" });
   }, [showPanel]);
 
-  const togglePanel = useCallback(() => setShowPanel((v) => !v), []);
+  const togglePanel = useCallback(() => setShowPanel((v) => { sessionStorage.setItem("pos_show_panel", v ? "0" : "1"); return !v; }), []);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -284,19 +308,271 @@ const POSPage = () => {
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="spinner"></div></div>;
 
+  const L = ui.labels;
+  const money = makeMoney(ui.format);
+  const fmtDate = makeDate(ui.format);
+  const visibleCols = ui.columns.filter((c) => c.visible);
+  const fontClass = FONT_CLASSES[ui.format.fontSize] || "text-sm";
+  const bgClass = BG_CLASSES[ui.format.invoiceBg] || BG_CLASSES.slate;
+  const panelLeft = ui.panel.side === "left";
+
+  const renderCell = (col, item, idx) => {
+    switch (col.key) {
+      case "index": return <td key="index" className="px-3 py-1.5 text-slate-400 font-mono text-xs">{idx + 1}</td>;
+      case "article": return (
+        <td key="article" className="px-3 py-1.5">
+          <p className="font-medium text-slate-900 leading-tight">{item.product_name}</p>
+          <p className="text-[11px] text-slate-400 font-mono">{item.sku} · stock {item.max_stock}</p>
+        </td>
+      );
+      case "unit": return <td key="unit" className="px-2 py-1.5 text-slate-600 text-xs">{item.unit || "—"}</td>;
+      case "qty": return (
+        <td key="qty" className="px-2 py-1.5">
+          <Input ref={(el) => { qtyRefs.current[item.product_id] = el; }} type="text" inputMode="decimal" value={item.qty_raw} onChange={(e) => onQtyChange(item, e.target.value)} onBlur={() => normalize(item)} onFocus={(e) => e.target.select()}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (canEditPrices && visibleCols.some((c) => c.key === "price")) setFocusTarget({ id: item.product_id, field: "price" }); else setFocusTarget({ field: "picker" }); } }}
+            className="w-full h-8 text-center font-mono rounded-sm px-1" title="Quantité (décimales acceptées : 0,5 ; 1,5…)" data-testid={`qty-input-${item.product_id}`} />
+        </td>
+      );
+      case "price": return (
+        <td key="price" className="px-2 py-1.5 text-right">
+          {canEditPrices ? (
+            <Input ref={(el) => { priceRefs.current[item.product_id] = el; }} type="text" inputMode="decimal" value={item.price_raw} onChange={(e) => onPriceChange(item, e.target.value)} onBlur={() => normalize(item)} onFocus={(e) => e.target.select()}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setFocusTarget({ field: "picker" }); } }}
+              className={`w-full h-8 text-right font-mono rounded-sm px-1 ${item.unit_price !== item.base_price ? "border-orange-400" : ""}`} data-testid={`price-input-${item.product_id}`} />
+          ) : <span className="font-mono">{money(item.unit_price)}</span>}
+        </td>
+      );
+      case "total": return <td key="total" className="px-3 py-1.5 text-right font-mono font-medium text-slate-900">{money(item.total)}</td>;
+      default: return null;
+    }
+  };
+
+  const renderField = (f) => {
+    if (ui.header.hiddenFields.includes(f)) return null;
+    if (f === "customer") return (
+      <div key={f} className="flex-1 min-w-[240px]">
+        <Label className="overline block mb-1">{L.customer}</Label>
+        <Select value={selectedCustomer} onValueChange={(v) => { setSelectedCustomer(v); if (paymentMethod === "avance") setPaymentMethod("especes"); }}>
+          <SelectTrigger className="rounded-sm bg-white h-9" data-testid="select-customer"><SelectValue placeholder="Client comptoir" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="comptoir">Client comptoir</SelectItem>
+            {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name} {c.balance > 0 ? `(Doit: ${money(c.balance)})` : c.balance < 0 ? `(Avance: ${money(-c.balance)})` : ""}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+    );
+    if (f === "date") return (
+      <div key={f} className="w-44">
+        <Label className="overline block mb-1">{L.date}</Label>
+        <Input type="date" value={invoiceDate} max={toInputDate(new Date())} onChange={(e) => setInvoiceDate(e.target.value)} className="h-9 rounded-sm bg-white font-mono text-sm" data-testid="invoice-date" />
+      </div>
+    );
+    return (
+      <div key={f} className="w-48">
+        <Label className="overline block mb-1">{L.po_ref}</Label>
+        <Input value={poRef} onChange={(e) => setPoRef(e.target.value)} placeholder="Facultatif" className="h-9 rounded-sm bg-white font-mono text-sm" data-testid="invoice-po-ref" />
+      </div>
+    );
+  };
+
+  const buttonsGroup = (
+    <div className={`flex gap-2 ${ui.header.buttonsPosition === "left" ? "" : "justify-end"}`} data-testid="invoice-action-buttons">
+      {ui.header.buttons.map((b) => b === "validate" ? (
+        <Button key={b} onClick={() => handleCheckout()} disabled={checkoutDisabled} className="btn-accent h-9" data-testid="checkout-btn">
+          {processing ? <div className="spinner w-4 h-4" /> : <><Receipt className="w-4 h-4 mr-2" /> {editing ? L.save : L.validate}</>}
+        </Button>
+      ) : b === "cancel" ? (
+        <Button key={b} variant="outline" onClick={resetAll} className="rounded-sm bg-white h-9 text-red-700 border-red-300 hover:bg-red-50" data-testid="cancel-invoice-btn"><XCircle className="w-4 h-4 mr-2" /> {L.cancel}</Button>
+      ) : (
+        <Button key={b} variant="outline" onClick={clearLines} className="rounded-sm bg-white h-9" data-testid="clear-cart-btn"><Eraser className="w-4 h-4 mr-2" /> {L.clear}</Button>
+      ))}
+    </div>
+  );
+
+  const invoiceCard = (
+    <div className="flex-1 min-w-0 xl:sticky xl:top-4 xl:self-start">
+      <Card className={`${bgClass} border rounded-sm shadow-lg`}>
+        <CardHeader className="border-b border-slate-300/70 pb-3">
+          <div className={`flex flex-wrap gap-3 items-end ${ui.header.buttonsPosition === "left" ? "flex-row-reverse" : ""}`}>
+            <div className="flex flex-wrap gap-3 items-end flex-1">{ui.header.fields.map(renderField)}</div>
+            {ui.header.buttonsPosition !== "below" && buttonsGroup}
+          </div>
+          {ui.header.buttonsPosition === "below" && <div className="mt-3">{buttonsGroup}</div>}
+          <div className="flex items-center justify-between text-xs text-slate-500 mt-2 flex-wrap gap-2">
+            <span>{L.customer} : <span className="font-medium text-slate-900" data-testid="invoice-customer-name">{customerName}</span></span>
+            <span data-testid="invoice-date-display">{fmtDate(invoiceDate)}{poRef ? ` · BC ${poRef}` : ""} · {cart.length} ligne{cart.length > 1 ? "s" : ""}</span>
+            <span>Établie par : <span className="font-medium text-slate-900">{editing ? editing.cashier_name : user?.name}</span></span>
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-0">
+          <div ref={linesRef} className="max-h-[360px] overflow-y-auto bg-white">
+            <table className={`w-full ${fontClass}`} data-testid="invoice-lines-table">
+              <thead className="bg-slate-200 text-[11px] uppercase tracking-wide text-slate-600 sticky top-0">
+                <tr>
+                  {visibleCols.map((c) => <th key={c.key} className={`px-3 py-2 font-medium ${c.key === "qty" ? "text-center" : ["price", "total"].includes(c.key) ? "text-right" : "text-left"}`} style={c.width ? { width: c.width } : undefined} data-testid={`col-${c.key}`}>{c.label}</th>)}
+                  <th className="w-10"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {cart.map((item, idx) => (
+                  <tr key={item.product_id} className="border-b border-slate-100 hover:bg-slate-50/60" data-testid={`invoice-line-${item.product_id}`}>
+                    {visibleCols.map((c) => renderCell(c, item, idx))}
+                    <td className="px-2 py-1.5 text-right">
+                      <Button variant="ghost" size="sm" tabIndex={-1} onClick={() => removeFromCart(item.product_id)} className="w-7 h-7 p-0 text-red-600" data-testid={`remove-item-${item.product_id}`}><Trash2 className="w-3.5 h-3.5" /></Button>
+                    </td>
+                  </tr>
+                ))}
+                <tr className="bg-green-50 sticky bottom-0 border-t border-green-200">
+                  <td colSpan={visibleCols.length + 1} className="px-3 py-2">
+                    <ProductPicker ref={pickerRef} products={products} value={searchTerm} onChange={setSearchTerm} onPick={(p) => addToCart(p, true)} onTab={focusList} placeholder={L.picker} />
+                  </td>
+                </tr>
+                {cart.length === 0 && (
+                  <tr><td colSpan={visibleCols.length + 1} className="text-center py-10 text-slate-400"><FileText className="w-10 h-10 mx-auto mb-2" /><p>Aucun article — tapez un nom ou une référence ci-dessus{showPanel ? ", ou choisissez dans la liste" : " (F4 pour la liste)"}</p></td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="border-t border-slate-300/70 px-4 py-4" data-testid="payment-section">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+              <div className="lg:col-span-7 space-y-3">
+                {editing ? (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-sm text-sm text-blue-900" data-testid="edit-mode-notice">
+                    <p className="font-medium">Règlements conservés : {money(editing.amount_paid)} déjà encaissés ({PAYMENT_METHODS.find((m) => m.value === editing.payment_method)?.label || editing.payment_method}).</p>
+                    <p className="text-xs mt-1">Le reste à payer et le solde du client seront recalculés avec le nouveau total.</p>
+                  </div>
+                ) : (
+                  <div>
+                    <Label className="overline block mb-2">{L.payment}</Label>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {visibleMethods.map((method) => (
+                        <Button key={method.value} variant={paymentMethod === method.value ? "default" : "outline"} onClick={() => setPaymentMethod(method.value)} className={`rounded-sm text-xs h-8 ${paymentButtonClass(method.value, paymentMethod === method.value)}`} data-testid={`payment-${method.value}`}>
+                          <method.icon className="w-3 h-3 mr-1" /> {method.label}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="overline block mb-1">{L.discount} — max {maxDiscountPct}%</Label>
+                    <Input type="number" value={discount} onChange={(e) => setDiscount(Math.max(0, parseFloat(e.target.value) || 0))} min="0" className={`rounded-sm font-mono bg-white h-9 ${discountTooHigh ? "border-red-500" : ""}`} data-testid="input-discount" />
+                    {discountTooHigh && <p className="text-xs text-red-600 mt-1" data-testid="discount-limit-warning">Plafond : {money(maxDiscount)}</p>}
+                  </div>
+                  {!editing && !isUnpaid && !isAdvance && (
+                    <div>
+                      <Label className="overline block mb-1">{L.amountPaid}</Label>
+                      <div className="flex gap-1">
+                        <Input type="number" value={amountPaid} onChange={(e) => setAmountPaid(Math.max(0, parseFloat(e.target.value) || 0))} min="0" className="rounded-sm font-mono bg-white h-9" data-testid="input-amount-paid" />
+                        <Button variant="outline" size="sm" onClick={() => setAmountPaid(total)} className="h-9 text-xs text-green-700 bg-white whitespace-nowrap" data-testid="exact-amount-btn">Exact</Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {advanceAvailable > 0 && !editing && (
+                  <div className="p-2.5 bg-teal-50 border border-teal-200 rounded-sm text-xs text-teal-800" data-testid="advance-notice">
+                    <span className="font-medium">Avance disponible : {money(advanceAvailable)}</span>
+                    {isAdvance ? <span> — la facture sera réglée avec l'avance ({money(effectiveAmountPaid)}).</span> : autoAdvance > 0 ? <span> — {money(autoAdvance)} seront imputés automatiquement.</span> : null}
+                  </div>
+                )}
+                {overdue && (
+                  <div className="p-2.5 bg-red-50 border-2 border-red-300 rounded-sm text-xs text-red-800" data-testid="overdue-block-notice">
+                    <p className="font-bold flex items-center gap-2 text-sm"><ShieldAlert className="w-4 h-4" /> Client en retard de paiement</p>
+                    <p className="mt-1">{money(overdue.overdue_amount)} impayés depuis {overdue.days_late} jours. {isManager ? "Vente à crédit autorisée (gérant) — elle sera tracée dans l'historique." : "Vente à crédit bloquée : paiement comptant ou autorisation du gérant requise."}</p>
+                  </div>
+                )}
+                {!editing && (isUnpaid || isAdvance) && (
+                  <div className={`p-2.5 rounded-sm text-xs ${isAdvance ? "bg-teal-50 border border-teal-200 text-teal-800" : "bg-red-50 border border-red-200 text-red-700"}`} data-testid={isAdvance ? "advance-pay-notice" : "unpaid-notice"}>
+                    {isAdvance ? "Règlement par avance client : aucun encaissement." : `Facture à crédit : aucun montant encaissé. Le total sera porté au compte du client${selectedCustomer === "comptoir" ? " — sélectionnez un client." : "."}`}
+                  </div>
+                )}
+              </div>
+              <div className="lg:col-span-5 space-y-2">
+                <div className={`bg-white border border-slate-200 rounded-sm p-3 space-y-1 ${fontClass}`}>
+                  <div className="flex justify-between"><span className="text-slate-500">{L.subtotal}</span><span className="font-mono" data-testid="pos-subtotal">{money(subtotal)}</span></div>
+                  {discount > 0 && <div className="flex justify-between text-green-600"><span>Remise</span><span className="font-mono">-{money(discount)}</span></div>}
+                  <div className="flex justify-between"><span className="text-slate-500">{editing ? "Déjà encaissé" : L.amountPaid}</span><span className="font-mono">{money(effectiveAmountPaid)}</span></div>
+                  {balanceDue > 0 ? (
+                    <div className="flex justify-between text-orange-600 font-medium"><span>{L.balanceDue}</span><span className="font-mono" data-testid="balance-due">{money(balanceDue)}</span></div>
+                  ) : balanceDue < 0 ? (
+                    <div className="flex justify-between text-green-600 font-medium"><span>{editing ? "Excédent (→ avance client)" : "Monnaie à rendre"}</span><span className="font-mono">{money(Math.abs(balanceDue))}</span></div>
+                  ) : null}
+                </div>
+                <div className="bg-slate-900 text-white p-4 rounded-sm flex justify-between items-center">
+                  <span className="font-bold">{L.total}</span>
+                  <span className="text-2xl font-mono font-bold" data-testid="pos-total">{money(total)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const articlesPanel = showPanel && (
+    <div className="xl:flex-none w-full" style={{ width: undefined }} data-testid="articles-panel">
+      <Card className="bg-white border border-slate-200 rounded-sm h-full">
+        <CardHeader className="border-b border-slate-100 pb-3 space-y-2">
+          <CardTitle className="font-[Chivo] text-base flex items-center gap-2"><PackageSearch className="w-4 h-4" /> {L.articles}</CardTitle>
+          <form onSubmit={handleBarcodeSubmit} className="flex gap-2">
+            <div className="flex-1 relative">
+              <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input ref={barcodeInputRef} placeholder="Code-barres / référence" value={barcodeInput} onChange={(e) => setBarcodeInput(e.target.value)} className="pl-9 rounded-sm font-mono h-9" data-testid="barcode-input" />
+            </div>
+            <Button type="submit" size="sm" className="btn-primary h-9" data-testid="barcode-submit-btn">Ajouter</Button>
+          </form>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Input placeholder="Rechercher un article..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onKeyDown={(e) => { if (e.key === "ArrowDown" || e.key === "Enter") { e.preventDefault(); focusList(); } }} className="pl-9 rounded-sm h-9" data-testid="search-pos-products" />
+          </div>
+          <p className="text-[11px] text-slate-400">↑ ↓ pour choisir · Entrée ou OK pour ajouter · <kbd className="px-1 border border-slate-300 rounded bg-slate-50 font-mono">F4</kbd> / Tab depuis la facture pour venir ici</p>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div ref={listRef} tabIndex={0} role="listbox" onKeyDown={onListKeyDown} className={`max-h-[640px] overflow-y-auto divide-y divide-slate-100 outline-none focus:ring-2 focus:ring-green-500 focus:ring-inset ${fontClass}`} data-testid="pos-products-list">
+            {filteredProducts.slice(0, 100).map((product, i) => (
+              <div key={product.id} role="option" aria-selected={i === listIndex} onClick={() => { setListIndex(i); if (product.stock > 0) addToCart(product, true); }} onMouseEnter={() => setListIndex(i)}
+                className={`w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors cursor-pointer ${i === listIndex ? "bg-green-100" : "hover:bg-green-50/60"} ${product.stock <= 0 ? "opacity-40 cursor-not-allowed" : ""}`} data-testid={`pos-product-${product.id}`}>
+                <div className="min-w-0 flex items-center gap-2">
+                  <ProductThumb product={product} size="w-9 h-9" />
+                  <div className="min-w-0">
+                    <p className="font-medium text-slate-900 truncate">{product.name}</p>
+                    <p className="text-[11px] text-slate-400 font-mono">{product.sku}</p>
+                  </div>
+                </div>
+                <div className="text-right flex-shrink-0 flex items-center gap-2">
+                  <div>
+                    <p className="font-mono font-medium text-slate-900">{money(product.price)}</p>
+                    <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-mono ${product.stock <= 0 ? "bg-red-100 text-red-700" : product.stock <= product.min_stock ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700"}`}>{product.stock} {product.unit}</span>
+                  </div>
+                  {i === listIndex && product.stock > 0 && (
+                    <Button size="sm" tabIndex={-1} className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={(e) => { e.stopPropagation(); addToCart(product, true); }} data-testid={`pos-product-ok-${product.id}`}>OK</Button>
+                  )}
+                </div>
+              </div>
+            ))}
+            {filteredProducts.length === 0 && <p className="text-center py-10 text-slate-400 text-sm">Aucun article trouvé</p>}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
   return (
     <div className="-m-6 lg:-m-8 p-6 lg:p-8 min-h-screen bg-slate-200/70 space-y-4" data-testid="pos-page">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold font-[Chivo] tracking-tight text-slate-900 flex items-center gap-2">
-            {editing ? <><Pencil className="w-5 h-5 text-blue-700" /> MODIFICATION DE LA FACTURE <span className="font-mono text-blue-700">{editing.invoice_number}</span></> : "FACTURE CLIENT"}
+            {editing ? <><Pencil className="w-5 h-5 text-blue-700" /> MODIFICATION DE LA FACTURE <span className="font-mono text-blue-700">{editing.invoice_number}</span></> : L.title}
           </h1>
           <p className="text-slate-500 mt-1 text-sm">{editing ? "Modifiez les lignes, le client ou la remise — les règlements déjà encaissés sont conservés." : "Saisissez l'article sur la facture (Entrée pour ajouter) ou Tab / F4 pour aller à la liste des articles, Entrée pour choisir, puis Tab vers Qté et P.U."}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {cashSession === null && (
-            <Link to="/cash" className="flex items-center gap-2 px-3 py-2 bg-orange-50 border border-orange-200 text-orange-800 text-sm rounded-sm hover:bg-orange-100 transition-colors" data-testid="pos-cash-closed-banner">
-              <Lock className="w-4 h-4" /> Caisse non ouverte — ouvrir la caisse
+            <Link to="/cash" className="flex items-center gap-2 px-2 py-1 bg-orange-50 border border-orange-200 text-orange-800 text-xs rounded-sm hover:bg-orange-100 transition-colors" data-testid="pos-cash-closed-banner">
+              <Lock className="w-3.5 h-3.5" /> Caisse non ouverte — ouvrir la caisse
             </Link>
           )}
           {cashSession && (
@@ -304,266 +580,35 @@ const POSPage = () => {
               <span className="w-2 h-2 rounded-full bg-green-500" /> Caisse ouverte
             </span>
           )}
+          {isAdmin && (
+            <Button variant="outline" className="rounded-sm bg-white" onClick={() => setCustomizeOpen(true)} data-testid="customize-invoice-ui-btn"><SlidersHorizontal className="w-4 h-4 mr-2" /> Personnaliser l'écran</Button>
+          )}
           <Button variant="outline" className="rounded-sm bg-white" onClick={togglePanel} data-testid="toggle-articles-panel-btn">
             {showPanel ? <PanelRightClose className="w-4 h-4 mr-2" /> : <PanelRightOpen className="w-4 h-4 mr-2" />} {showPanel ? "Masquer les articles" : "Afficher les articles"}
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
-        {/* FACTURE */}
-        <div className={`${showPanel ? "xl:col-span-8" : "xl:col-span-12"} xl:sticky xl:top-4 xl:self-start`}>
-          <Card className="bg-slate-100 border border-slate-300 rounded-sm shadow-lg">
-            <CardHeader className="border-b border-slate-300 pb-3 bg-slate-100">
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
-                <div className="lg:col-span-4">
-                  <Label className="overline block mb-1">Client</Label>
-                  <Select value={selectedCustomer} onValueChange={(v) => { setSelectedCustomer(v); if (paymentMethod === "avance") setPaymentMethod("especes"); }}>
-                    <SelectTrigger className="rounded-sm bg-white h-9" data-testid="select-customer"><SelectValue placeholder="Client comptoir" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="comptoir">Client comptoir</SelectItem>
-                      {customers.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>{c.name} {c.balance > 0 ? `(Doit: ${formatCurrency(c.balance)})` : c.balance < 0 ? `(Avance: ${formatCurrency(-c.balance)})` : ""}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="lg:col-span-2">
-                  <Label className="overline block mb-1">Date de facture</Label>
-                  <Input type="date" value={invoiceDate} max={toInputDate(new Date())} onChange={(e) => setInvoiceDate(e.target.value)} className="h-9 rounded-sm bg-white font-mono text-sm" data-testid="invoice-date" />
-                </div>
-                <div className="lg:col-span-2">
-                  <Label className="overline block mb-1">N° bon de commande</Label>
-                  <Input value={poRef} onChange={(e) => setPoRef(e.target.value)} placeholder="Facultatif" className="h-9 rounded-sm bg-white font-mono text-sm" data-testid="invoice-po-ref" />
-                </div>
-                <div className="lg:col-span-4 flex gap-2 justify-end">
-                  <Button onClick={() => handleCheckout()} disabled={checkoutDisabled} className="btn-accent h-9" data-testid="checkout-btn">
-                    {processing ? <div className="spinner w-4 h-4" /> : <><Receipt className="w-4 h-4 mr-2" /> {editing ? "Enregistrer" : "Valider"}</>}
-                  </Button>
-                  <Button variant="outline" onClick={resetAll} className="rounded-sm bg-white h-9 text-red-700 border-red-300 hover:bg-red-50" data-testid="cancel-invoice-btn"><XCircle className="w-4 h-4 mr-2" /> Annuler</Button>
-                  <Button variant="outline" onClick={clearLines} className="rounded-sm bg-white h-9" data-testid="clear-cart-btn"><Eraser className="w-4 h-4 mr-2" /> Vider</Button>
-                </div>
-              </div>
-              <div className="flex items-center justify-between text-xs text-slate-500 mt-2">
-                <span>Client : <span className="font-medium text-slate-900" data-testid="invoice-customer-name">{customerName}</span></span>
-                <span>{cart.length} ligne{cart.length > 1 ? "s" : ""}</span>
-                <span>Établie par : <span className="font-medium text-slate-900">{editing ? editing.cashier_name : user?.name}</span></span>
-              </div>
-            </CardHeader>
-
-            <CardContent className="p-0">
-              <div ref={linesRef} className="max-h-[360px] overflow-y-auto bg-white">
-                <table className="w-full text-sm" data-testid="invoice-lines-table">
-                  <thead className="bg-slate-200 text-[11px] uppercase tracking-wide text-slate-600 sticky top-0">
-                    <tr>
-                      <th className="text-left px-3 py-2 font-medium w-8">#</th>
-                      <th className="text-left px-3 py-2 font-medium">Article</th>
-                      <th className="text-left px-2 py-2 font-medium w-20">Unité</th>
-                      <th className="text-center px-2 py-2 font-medium w-28">Qté</th>
-                      <th className="text-right px-2 py-2 font-medium w-32">P.U.</th>
-                      <th className="text-right px-3 py-2 font-medium w-32">Total</th>
-                      <th className="w-10"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cart.map((item, idx) => (
-                      <tr key={item.product_id} className="border-b border-slate-100 hover:bg-slate-50/60" data-testid={`invoice-line-${item.product_id}`}>
-                        <td className="px-3 py-1.5 text-slate-400 font-mono text-xs">{idx + 1}</td>
-                        <td className="px-3 py-1.5">
-                          <p className="font-medium text-slate-900 leading-tight">{item.product_name}</p>
-                          <p className="text-[11px] text-slate-400 font-mono">{item.sku} · stock {item.max_stock}</p>
-                        </td>
-                        <td className="px-2 py-1.5 text-slate-600 text-xs">{item.unit || "—"}</td>
-                        <td className="px-2 py-1.5">
-                          <Input
-                            ref={(el) => { qtyRefs.current[item.product_id] = el; }}
-                            type="text" inputMode="decimal"
-                            value={item.qty_raw}
-                            onChange={(e) => onQtyChange(item, e.target.value)}
-                            onBlur={() => normalize(item)}
-                            onFocus={(e) => e.target.select()}
-                            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (canEditPrices) setFocusTarget({ id: item.product_id, field: "price" }); else setFocusTarget({ field: "picker" }); } }}
-                            className="w-full h-8 text-center font-mono text-sm rounded-sm px-1"
-                            title="Quantité (décimales acceptées : 0,5 ; 1,5…)"
-                            data-testid={`qty-input-${item.product_id}`}
-                          />
-                        </td>
-                        <td className="px-2 py-1.5 text-right">
-                          {canEditPrices ? (
-                            <Input
-                              ref={(el) => { priceRefs.current[item.product_id] = el; }}
-                              type="text" inputMode="decimal"
-                              value={item.price_raw}
-                              onChange={(e) => onPriceChange(item, e.target.value)}
-                              onBlur={() => normalize(item)}
-                              onFocus={(e) => e.target.select()}
-                              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setFocusTarget({ field: "picker" }); } }}
-                              className={`w-full h-8 text-right font-mono text-sm rounded-sm px-1 ${item.unit_price !== item.base_price ? "border-orange-400" : ""}`}
-                              data-testid={`price-input-${item.product_id}`}
-                            />
-                          ) : (
-                            <span className="font-mono">{formatCurrency(item.unit_price)}</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-1.5 text-right font-mono font-medium text-slate-900">{formatCurrency(item.total)}</td>
-                        <td className="px-2 py-1.5 text-right">
-                          <Button variant="ghost" size="sm" tabIndex={-1} onClick={() => removeFromCart(item.product_id)} className="w-7 h-7 p-0 text-red-600" data-testid={`remove-item-${item.product_id}`}><Trash2 className="w-3.5 h-3.5" /></Button>
-                        </td>
-                      </tr>
-                    ))}
-                    <tr className="bg-green-50 sticky bottom-0 border-t border-green-200">
-                      <td className="px-3 py-2 text-slate-400 font-mono text-xs">{cart.length + 1}</td>
-                      <td colSpan={6} className="px-3 py-2">
-                        <ProductPicker ref={pickerRef} products={products} value={searchTerm} onChange={setSearchTerm} onPick={(p) => addToCart(p, true)} onTab={focusList} />
-                      </td>
-                    </tr>
-                    {cart.length === 0 && (
-                      <tr>
-                        <td colSpan={7} className="text-center py-10 text-slate-400">
-                          <FileText className="w-10 h-10 mx-auto mb-2" />
-                          <p>Aucun article — tapez un nom ou une référence ci-dessus{showPanel ? ", ou cliquez un article à droite" : ""}</p>
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* RÈGLEMENT (bas de facture) */}
-              <div className="border-t border-slate-300 bg-slate-100 px-4 py-4" data-testid="payment-section">
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                  <div className="lg:col-span-7 space-y-3">
-                    {editing ? (
-                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-sm text-sm text-blue-900" data-testid="edit-mode-notice">
-                        <p className="font-medium">Règlements conservés : {formatCurrency(editing.amount_paid)} déjà encaissés ({PAYMENT_METHODS.find((m) => m.value === editing.payment_method)?.label || editing.payment_method}).</p>
-                        <p className="text-xs mt-1">Le reste à payer et le solde du client seront recalculés avec le nouveau total.</p>
-                      </div>
-                    ) : (
-                      <div>
-                        <Label className="overline block mb-2">Mode de règlement</Label>
-                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                          {visibleMethods.map((method) => (
-                            <Button key={method.value} variant={paymentMethod === method.value ? "default" : "outline"} onClick={() => setPaymentMethod(method.value)} className={`rounded-sm text-xs h-8 ${paymentButtonClass(method.value, paymentMethod === method.value)}`} data-testid={`payment-${method.value}`}>
-                              <method.icon className="w-3 h-3 mr-1" /> {method.label}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label className="overline block mb-1">Remise (XOF) — max {maxDiscountPct}%</Label>
-                        <Input type="number" value={discount} onChange={(e) => setDiscount(Math.max(0, parseFloat(e.target.value) || 0))} min="0" className={`rounded-sm font-mono bg-white h-9 ${discountTooHigh ? "border-red-500" : ""}`} data-testid="input-discount" />
-                        {discountTooHigh && <p className="text-xs text-red-600 mt-1" data-testid="discount-limit-warning">Plafond : {formatCurrency(maxDiscount)}</p>}
-                      </div>
-                      {!editing && !isUnpaid && !isAdvance && (
-                        <div>
-                          <Label className="overline block mb-1">Montant reçu (XOF)</Label>
-                          <div className="flex gap-1">
-                            <Input type="number" value={amountPaid} onChange={(e) => setAmountPaid(Math.max(0, parseFloat(e.target.value) || 0))} min="0" className="rounded-sm font-mono bg-white h-9" data-testid="input-amount-paid" />
-                            <Button variant="outline" size="sm" onClick={() => setAmountPaid(total)} className="h-9 text-xs text-green-700 bg-white whitespace-nowrap" data-testid="exact-amount-btn">Exact</Button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    {advanceAvailable > 0 && !editing && (
-                      <div className="p-2.5 bg-teal-50 border border-teal-200 rounded-sm text-xs text-teal-800" data-testid="advance-notice">
-                        <span className="font-medium">Avance disponible : {formatCurrency(advanceAvailable)}</span>
-                        {isAdvance ? <span> — la facture sera réglée avec l'avance ({formatCurrency(effectiveAmountPaid)}).</span> : autoAdvance > 0 ? <span> — {formatCurrency(autoAdvance)} seront imputés automatiquement.</span> : null}
-                      </div>
-                    )}
-                    {overdue && (
-                      <div className="p-2.5 bg-red-50 border-2 border-red-300 rounded-sm text-xs text-red-800" data-testid="overdue-block-notice">
-                        <p className="font-bold flex items-center gap-2 text-sm"><ShieldAlert className="w-4 h-4" /> Client en retard de paiement</p>
-                        <p className="mt-1">{formatCurrency(overdue.overdue_amount)} impayés depuis {overdue.days_late} jours. {isManager ? "Vente à crédit autorisée (gérant) — elle sera tracée dans l'historique." : "Vente à crédit bloquée : paiement comptant ou autorisation du gérant requise."}</p>
-                      </div>
-                    )}
-                    {!editing && (isUnpaid || isAdvance) && (
-                      <div className={`p-2.5 rounded-sm text-xs ${isAdvance ? "bg-teal-50 border border-teal-200 text-teal-800" : "bg-red-50 border border-red-200 text-red-700"}`} data-testid={isAdvance ? "advance-pay-notice" : "unpaid-notice"}>
-                        {isAdvance ? "Règlement par avance client : aucun encaissement." : `Facture à crédit : aucun montant encaissé. Le total sera porté au compte du client${selectedCustomer === "comptoir" ? " — sélectionnez un client." : "."}`}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="lg:col-span-5 space-y-2">
-                    <div className="bg-white border border-slate-200 rounded-sm p-3 space-y-1 text-sm">
-                      <div className="flex justify-between"><span className="text-slate-500">Sous-total</span><span className="font-mono" data-testid="pos-subtotal">{formatCurrency(subtotal)}</span></div>
-                      {discount > 0 && <div className="flex justify-between text-green-600"><span>Remise</span><span className="font-mono">-{formatCurrency(discount)}</span></div>}
-                      <div className="flex justify-between"><span className="text-slate-500">{editing ? "Déjà encaissé" : "Montant reçu"}</span><span className="font-mono">{formatCurrency(effectiveAmountPaid)}</span></div>
-                      {balanceDue > 0 ? (
-                        <div className="flex justify-between text-orange-600 font-medium"><span>Reste à payer</span><span className="font-mono" data-testid="balance-due">{formatCurrency(balanceDue)}</span></div>
-                      ) : balanceDue < 0 ? (
-                        <div className="flex justify-between text-green-600 font-medium"><span>{editing ? "Excédent (→ avance client)" : "Monnaie à rendre"}</span><span className="font-mono">{formatCurrency(Math.abs(balanceDue))}</span></div>
-                      ) : null}
-                    </div>
-                    <div className="bg-slate-900 text-white p-4 rounded-sm flex justify-between items-center">
-                      <span className="font-bold">TOTAL</span>
-                      <span className="text-2xl font-mono font-bold" data-testid="pos-total">{formatCurrency(total)}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* ARTICLES */}
+      <div ref={containerRef} className={`flex flex-col xl:flex-row gap-4 ${panelLeft ? "xl:flex-row-reverse" : ""}`} data-testid="pos-layout">
+        {invoiceCard}
         {showPanel && (
-          <div className="xl:col-span-4" data-testid="articles-panel">
-            <Card className="bg-white border border-slate-200 rounded-sm h-full">
-              <CardHeader className="border-b border-slate-100 pb-3 space-y-2">
-                <CardTitle className="font-[Chivo] text-base flex items-center gap-2"><PackageSearch className="w-4 h-4" /> Articles</CardTitle>
-                <form onSubmit={handleBarcodeSubmit} className="flex gap-2">
-                  <div className="flex-1 relative">
-                    <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <Input ref={barcodeInputRef} placeholder="Code-barres / référence" value={barcodeInput} onChange={(e) => setBarcodeInput(e.target.value)} className="pl-9 rounded-sm font-mono h-9" data-testid="barcode-input" />
-                  </div>
-                  <Button type="submit" size="sm" className="btn-primary h-9" data-testid="barcode-submit-btn">Ajouter</Button>
-                </form>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <Input placeholder="Rechercher un article..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onKeyDown={(e) => { if (e.key === "ArrowDown" || e.key === "Enter") { e.preventDefault(); focusList(); } }} className="pl-9 rounded-sm h-9" data-testid="search-pos-products" />
-                </div>
-                <p className="text-[11px] text-slate-400">↑ ↓ pour choisir · Entrée ou OK pour ajouter · <kbd className="px-1 border border-slate-300 rounded bg-slate-50 font-mono">F4</kbd> / Tab depuis la facture pour venir ici</p>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div ref={listRef} tabIndex={0} role="listbox" onKeyDown={onListKeyDown} className="max-h-[640px] overflow-y-auto divide-y divide-slate-100 outline-none focus:ring-2 focus:ring-green-500 focus:ring-inset" data-testid="pos-products-list">
-                  {filteredProducts.slice(0, 100).map((product, i) => (
-                    <div
-                      key={product.id}
-                      role="option"
-                      aria-selected={i === listIndex}
-                      onClick={() => { setListIndex(i); if (product.stock > 0) addToCart(product, true); }}
-                      onMouseEnter={() => setListIndex(i)}
-                      className={`w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors cursor-pointer ${i === listIndex ? "bg-green-100" : "hover:bg-green-50/60"} ${product.stock <= 0 ? "opacity-40 cursor-not-allowed" : ""}`}
-                      data-testid={`pos-product-${product.id}`}
-                    >
-                      <div className="min-w-0 flex items-center gap-2">
-                        <ProductThumb product={product} size="w-9 h-9" />
-                        <div className="min-w-0">
-                          <p className="font-medium text-slate-900 text-sm truncate">{product.name}</p>
-                          <p className="text-[11px] text-slate-400 font-mono">{product.sku}</p>
-                        </div>
-                      </div>
-                      <div className="text-right flex-shrink-0 flex items-center gap-2">
-                        <div>
-                          <p className="font-mono font-medium text-slate-900 text-sm">{formatCurrency(product.price)}</p>
-                          <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-mono ${product.stock <= 0 ? "bg-red-100 text-red-700" : product.stock <= product.min_stock ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700"}`}>{product.stock} {product.unit}</span>
-                        </div>
-                        {i === listIndex && product.stock > 0 && (
-                          <Button size="sm" tabIndex={-1} className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={(e) => { e.stopPropagation(); addToCart(product, true); }} data-testid={`pos-product-ok-${product.id}`}>OK</Button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {filteredProducts.length === 0 && <p className="text-center py-10 text-slate-400 text-sm">Aucun article trouvé</p>}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <>
+            <div
+              role="separator"
+              onMouseDown={isAdmin ? startDrag : undefined}
+              className={`hidden xl:flex w-2 -mx-1 rounded-full items-center justify-center ${isAdmin ? "cursor-col-resize hover:bg-green-300/70" : ""} ${dragging ? "bg-green-400" : ""}`}
+              title={isAdmin ? "Glisser pour redimensionner" : undefined}
+              data-testid="panel-resize-handle"
+            >
+              <div className="w-0.5 h-10 bg-slate-400 rounded-full" />
+            </div>
+            <div className="w-full xl:w-auto xl:flex-none" style={{ flexBasis: `${ui.panel.width}%` }} data-testid="articles-panel-wrapper">{articlesPanel}</div>
+          </>
         )}
       </div>
+
       <ManagerAuthDialog open={authOpen} onOpenChange={setAuthOpen} overdue={overdue} customerName={customerName} processing={processing} onAuthorize={(auth) => handleCheckout(auth)} />
+      {isAdmin && <InvoiceUiCustomizer open={customizeOpen} onOpenChange={setCustomizeOpen} ui={ui} update={updateUi} onSave={() => saveUi()} onReset={resetUi} onCancel={revertUi} />}
     </div>
   );
 };

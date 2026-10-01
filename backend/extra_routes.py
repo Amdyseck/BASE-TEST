@@ -140,6 +140,30 @@ async def update_overdue_days(data: OverdueDays, user: dict = Depends(require_ro
     return {"overdue_days": data.overdue_days}
 
 
+# ==================== PERSONNALISATION ÉCRAN FACTURE ====================
+
+@router.get("/settings/invoice-ui")
+async def get_invoice_ui(user: dict = Depends(get_current_user)):
+    doc = await db.settings.find_one({"key": "invoice_ui"}, {"_id": 0, "key": 0})
+    return doc or {}
+
+
+@router.put("/settings/invoice-ui")
+async def update_invoice_ui(data: dict, user: dict = Depends(require_role(["admin"]))):
+    if not isinstance(data, dict) or len(str(data)) > 20000:
+        raise HTTPException(status_code=400, detail="Configuration invalide")
+    await db.settings.update_one({"key": "invoice_ui"}, {"$set": {**data, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": user["name"]}}, upsert=True)
+    await log_audit(user, "update", "settings", "settings", "invoice_ui", "Écran facture", after={"sections": list(data.keys())})
+    return data
+
+
+@router.delete("/settings/invoice-ui")
+async def reset_invoice_ui(user: dict = Depends(require_role(["admin"]))):
+    await db.settings.delete_one({"key": "invoice_ui"})
+    await log_audit(user, "update", "settings", "settings", "invoice_ui", "Écran facture réinitialisé")
+    return {}
+
+
 ALLOWED_LOGO_TYPES = {"image/png", "image/jpeg", "image/webp", "image/gif"}
 
 
