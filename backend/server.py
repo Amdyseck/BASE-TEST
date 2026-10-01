@@ -162,6 +162,8 @@ class SaleBase(BaseModel):
     amount_paid: float = 0
     discount: float = 0
     notes: Optional[str] = ""
+    invoice_date: Optional[str] = None  # YYYY-MM-DD (antidatée possible)
+    purchase_order_ref: Optional[str] = ""  # N° bon de commande client
     manager_authorization: Optional[ManagerAuthorization] = None
 
 class Sale(SaleBase):
@@ -986,6 +988,21 @@ async def next_sequence(name: str) -> int:
 async def generate_invoice_number():
     return f"VTE{str(await next_sequence('sale')).zfill(7)}"
 
+def parse_invoice_date(value: Optional[str]) -> Optional[datetime]:
+    """Date choisie (YYYY-MM-DD) combinée à l'heure courante ; None si vide ou aujourd'hui."""
+    if not value:
+        return None
+    try:
+        d = datetime.strptime(value[:10], "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Date de facture invalide")
+    now = datetime.now(timezone.utc)
+    if d == now.date():
+        return None
+    if d > now.date():
+        raise HTTPException(status_code=400, detail="La date de facture ne peut pas être dans le futur")
+    return datetime.combine(d, now.time(), tzinfo=timezone.utc)
+
 @api_router.post("/sales", response_model=Sale)
 async def create_sale(sale_data: SaleBase, user: dict = Depends(require_module("pos"))):
     perms = effective_permissions(user)
@@ -1070,6 +1087,9 @@ async def create_sale(sale_data: SaleBase, user: dict = Depends(require_module("
         cashier_id=user["id"],
         cashier_name=user["name"]
     )
+    custom_dt = parse_invoice_date(sale_data.invoice_date)
+    if custom_dt:
+        sale.created_at = custom_dt
     
     # Update stock for each item
     for item in sale_data.items:

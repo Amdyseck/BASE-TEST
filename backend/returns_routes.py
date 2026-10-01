@@ -5,7 +5,7 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
-from server import db, get_current_user, require_module, require_perm, effective_permissions, record_cash_movement, log_audit, next_sequence, SaleItem, Payment
+from server import db, get_current_user, require_module, require_perm, effective_permissions, record_cash_movement, log_audit, next_sequence, parse_invoice_date, SaleItem, Payment
 
 router = APIRouter()
 
@@ -22,6 +22,8 @@ class SaleEdit(BaseModel):
     customer_name: Optional[str] = None
     discount: float = 0
     notes: Optional[str] = ""
+    invoice_date: Optional[str] = None
+    purchase_order_ref: Optional[str] = ""
 
 
 @router.put("/sales/{sale_id}")
@@ -90,10 +92,14 @@ async def edit_sale(sale_id: str, data: SaleEdit, user: dict = Depends(require_p
         "balance_due": balance_due,
         "is_paid": balance_due <= 0,
         "notes": data.notes or "",
+        "purchase_order_ref": data.purchase_order_ref or "",
         "edited_at": _now(),
         "edited_by": user["name"],
         "edit_count": int(sale.get("edit_count", 0)) + 1,
     }
+    if data.invoice_date and data.invoice_date[:10] != str(sale.get("created_at", ""))[:10]:
+        new_dt = parse_invoice_date(data.invoice_date)
+        update["created_at"] = (new_dt or datetime.now(timezone.utc)).isoformat()
     await db.sales.update_one({"id": sale_id}, {"$set": update})
     before = {"client": sale.get("customer_name"), "total": sale.get("total"), "remise": sale.get("discount"), "articles": [f"{i['product_name']} x{i['quantity']:g} @ {i['unit_price']:g}" for i in sale.get("items", [])]}
     after = {"client": customer_name, "total": total, "remise": update["discount"], "articles": [f"{i.product_name} x{i.quantity:g} @ {i.unit_price:g}" for i in data.items]}

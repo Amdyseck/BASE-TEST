@@ -16,7 +16,7 @@ import { ProductPicker } from "../components/ProductPicker";
 
 const formatCurrency = (amount) =>
   new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", minimumFractionDigits: 0 }).format(amount || 0);
-const formatDate = (d) => new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+const toInputDate = (d) => { const x = new Date(d); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`; };
 const parseNum = (v) => parseFloat(String(v).replace(",", "."));
 
 const PAYMENT_METHODS = [
@@ -47,7 +47,9 @@ const POSPage = () => {
   const priceRefs = useRef({});
   const [listIndex, setListIndex] = useState(0);
   const [focusTarget, setFocusTarget] = useState(null);
-  const [showPanel, setShowPanel] = useState(() => localStorage.getItem("pos_show_panel") !== "0");
+  const [showPanel, setShowPanel] = useState(() => localStorage.getItem("pos_show_panel") === "1");
+  const [invoiceDate, setInvoiceDate] = useState(() => toInputDate(new Date()));
+  const [poRef, setPoRef] = useState("");
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [cart, setCart] = useState([]);
@@ -87,6 +89,8 @@ const POSPage = () => {
         setSelectedCustomer(sale.customer_id || "comptoir");
         setDiscount(sale.discount || 0);
         setPaymentMethod(sale.payment_method);
+        setInvoiceDate(toInputDate(sale.created_at));
+        setPoRef(sale.purchase_order_ref || "");
       } else {
         setEditing(null);
       }
@@ -225,6 +229,8 @@ const POSPage = () => {
         customer_name: customerId ? selectedCustomerObj?.name : "Client Comptoir",
         discount,
         notes: editing.notes || "",
+        invoice_date: invoiceDate,
+        purchase_order_ref: poRef,
       });
       toast.success(`Facture ${editing.invoice_number} modifiée`);
       navigate(`/invoice/${editing.id}`);
@@ -250,6 +256,8 @@ const POSPage = () => {
         payment_method: paymentMethod,
         amount_paid: effectiveAmountPaid,
         discount,
+        invoice_date: invoiceDate,
+        purchase_order_ref: poRef,
         manager_authorization: managerAuth || undefined,
       });
       if (managerAuth) toast.success("Vente autorisée par le gérant");
@@ -281,7 +289,7 @@ const POSPage = () => {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold font-[Chivo] tracking-tight text-slate-900 flex items-center gap-2">
-            {editing ? <><Pencil className="w-5 h-5 text-blue-700" /> MODIFICATION DE LA FACTURE <span className="font-mono text-blue-700">{editing.invoice_number}</span></> : "VENTE"}
+            {editing ? <><Pencil className="w-5 h-5 text-blue-700" /> MODIFICATION DE LA FACTURE <span className="font-mono text-blue-700">{editing.invoice_number}</span></> : "FACTURE CLIENT"}
           </h1>
           <p className="text-slate-500 mt-1 text-sm">{editing ? "Modifiez les lignes, le client ou la remise — les règlements déjà encaissés sont conservés." : "Saisissez l'article sur la facture (Entrée pour ajouter) ou Tab / F4 pour aller à la liste des articles, Entrée pour choisir, puis Tab vers Qté et P.U."}</p>
         </div>
@@ -292,7 +300,7 @@ const POSPage = () => {
             </Link>
           )}
           {cashSession && (
-            <span className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 text-green-800 text-sm rounded-sm" data-testid="pos-cash-open-badge">
+            <span className="flex items-center gap-2 px-2 py-1 bg-green-50 border border-green-200 text-green-800 text-xs rounded-sm" data-testid="pos-cash-open-badge">
               <span className="w-2 h-2 rounded-full bg-green-500" /> Caisse ouverte
             </span>
           )}
@@ -308,7 +316,7 @@ const POSPage = () => {
           <Card className="bg-slate-100 border border-slate-300 rounded-sm shadow-lg">
             <CardHeader className="border-b border-slate-300 pb-3 bg-slate-100">
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
-                <div className="lg:col-span-5">
+                <div className="lg:col-span-4">
                   <Label className="overline block mb-1">Client</Label>
                   <Select value={selectedCustomer} onValueChange={(v) => { setSelectedCustomer(v); if (paymentMethod === "avance") setPaymentMethod("especes"); }}>
                     <SelectTrigger className="rounded-sm bg-white h-9" data-testid="select-customer"><SelectValue placeholder="Client comptoir" /></SelectTrigger>
@@ -321,10 +329,14 @@ const POSPage = () => {
                   </Select>
                 </div>
                 <div className="lg:col-span-2">
-                  <Label className="overline block mb-1">Date</Label>
-                  <div className="h-9 px-3 flex items-center bg-white border border-slate-200 rounded-sm font-mono text-sm" data-testid="invoice-date">{formatDate(editing ? editing.created_at : new Date())}</div>
+                  <Label className="overline block mb-1">Date de facture</Label>
+                  <Input type="date" value={invoiceDate} max={toInputDate(new Date())} onChange={(e) => setInvoiceDate(e.target.value)} className="h-9 rounded-sm bg-white font-mono text-sm" data-testid="invoice-date" />
                 </div>
-                <div className="lg:col-span-5 flex gap-2 justify-end">
+                <div className="lg:col-span-2">
+                  <Label className="overline block mb-1">N° bon de commande</Label>
+                  <Input value={poRef} onChange={(e) => setPoRef(e.target.value)} placeholder="Facultatif" className="h-9 rounded-sm bg-white font-mono text-sm" data-testid="invoice-po-ref" />
+                </div>
+                <div className="lg:col-span-4 flex gap-2 justify-end">
                   <Button onClick={() => handleCheckout()} disabled={checkoutDisabled} className="btn-accent h-9" data-testid="checkout-btn">
                     {processing ? <div className="spinner w-4 h-4" /> : <><Receipt className="w-4 h-4 mr-2" /> {editing ? "Enregistrer" : "Valider"}</>}
                   </Button>
@@ -335,7 +347,7 @@ const POSPage = () => {
               <div className="flex items-center justify-between text-xs text-slate-500 mt-2">
                 <span>Client : <span className="font-medium text-slate-900" data-testid="invoice-customer-name">{customerName}</span></span>
                 <span>{cart.length} ligne{cart.length > 1 ? "s" : ""}</span>
-                <span>Vendeur : <span className="font-medium text-slate-900">{editing ? editing.cashier_name : user?.name}</span></span>
+                <span>Établie par : <span className="font-medium text-slate-900">{editing ? editing.cashier_name : user?.name}</span></span>
               </div>
             </CardHeader>
 
@@ -346,6 +358,7 @@ const POSPage = () => {
                     <tr>
                       <th className="text-left px-3 py-2 font-medium w-8">#</th>
                       <th className="text-left px-3 py-2 font-medium">Article</th>
+                      <th className="text-left px-2 py-2 font-medium w-20">Unité</th>
                       <th className="text-center px-2 py-2 font-medium w-28">Qté</th>
                       <th className="text-right px-2 py-2 font-medium w-32">P.U.</th>
                       <th className="text-right px-3 py-2 font-medium w-32">Total</th>
@@ -358,8 +371,9 @@ const POSPage = () => {
                         <td className="px-3 py-1.5 text-slate-400 font-mono text-xs">{idx + 1}</td>
                         <td className="px-3 py-1.5">
                           <p className="font-medium text-slate-900 leading-tight">{item.product_name}</p>
-                          <p className="text-[11px] text-slate-400 font-mono">{item.sku}{item.unit ? ` · ${item.unit}` : ""} · stock {item.max_stock}</p>
+                          <p className="text-[11px] text-slate-400 font-mono">{item.sku} · stock {item.max_stock}</p>
                         </td>
+                        <td className="px-2 py-1.5 text-slate-600 text-xs">{item.unit || "—"}</td>
                         <td className="px-2 py-1.5">
                           <Input
                             ref={(el) => { qtyRefs.current[item.product_id] = el; }}
@@ -399,13 +413,13 @@ const POSPage = () => {
                     ))}
                     <tr className="bg-green-50 sticky bottom-0 border-t border-green-200">
                       <td className="px-3 py-2 text-slate-400 font-mono text-xs">{cart.length + 1}</td>
-                      <td colSpan={5} className="px-3 py-2">
+                      <td colSpan={6} className="px-3 py-2">
                         <ProductPicker ref={pickerRef} products={products} value={searchTerm} onChange={setSearchTerm} onPick={(p) => addToCart(p, true)} onTab={focusList} />
                       </td>
                     </tr>
                     {cart.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="text-center py-10 text-slate-400">
+                        <td colSpan={7} className="text-center py-10 text-slate-400">
                           <FileText className="w-10 h-10 mx-auto mb-2" />
                           <p>Aucun article — tapez un nom ou une référence ci-dessus{showPanel ? ", ou cliquez un article à droite" : ""}</p>
                         </td>

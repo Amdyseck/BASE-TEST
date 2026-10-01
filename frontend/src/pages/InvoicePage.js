@@ -129,9 +129,10 @@ const InvoicePage = () => {
         <div className="border border-blue-200 rounded-sm p-2">
           <p className="overline mb-1">Date</p>
           <p className="font-medium text-slate-900" data-testid={lg ? "invoice-date" : undefined}>{formatDate(sale.created_at)}</p>
+          {sale.purchase_order_ref && <p className="text-xs text-slate-600 mt-1" data-testid={lg ? "invoice-po-ref" : undefined}>Bon de commande : <span className="font-mono font-medium">{sale.purchase_order_ref}</span></p>}
         </div>
         <div className="border border-blue-200 rounded-sm p-2">
-          <p className="overline mb-1">Vendeur / Caissier</p>
+          <p className="overline mb-1">Établie par</p>
           <p className="font-medium text-slate-900">{sale.cashier_name}</p>
         </div>
       </div>

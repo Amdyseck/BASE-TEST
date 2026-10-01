@@ -53,7 +53,7 @@ const Layout = () => {
 
   const groups = [
     { key: "vente", label: "VENTE", icon: ShoppingCart, items: [
-      { to: "/pos", icon: ShoppingCart, label: "Nouvelle vente", module: "pos" },
+      { to: "/pos", icon: ShoppingCart, label: "Nouvelle facture", module: "pos" },
       { to: "/sales", icon: Receipt, label: "Documents des ventes", module: "sales" },
       { to: "/returns/customer", icon: Undo2, label: "Retours clients", module: "sales" },
       { to: "/customers", icon: Users, label: "Clients", module: "customers" },
