@@ -6,7 +6,7 @@ import { PaymentBadge } from "../lib/paymentMethods";
 import api from "../lib/api";
 import { Button } from "../components/ui/button";
 import { toast } from "sonner";
-import { X, Receipt, FileText, PlusCircle, Pencil, Undo2 } from "lucide-react";
+import { X, Receipt, FileText, PlusCircle, Pencil, Undo2, Truck } from "lucide-react";
 
 const InvoicePage = () => {
   const { saleId } = useParams();
@@ -230,6 +230,14 @@ const InvoicePage = () => {
               <Button variant="outline" className="rounded-sm text-orange-700 border-orange-300" data-testid="return-invoice-btn">
                 <Undo2 className="w-4 h-4 mr-2" />
                 Retour
+              </Button>
+            </Link>
+          )}
+          {sale.status !== "cancelled" && (
+            <Link to={`/delivery/${sale.id}`}>
+              <Button variant="outline" className="rounded-sm text-emerald-700 border-emerald-300" data-testid="delivery-note-btn">
+                <Truck className="w-4 h-4 mr-2" />
+                Bon de livraison
               </Button>
             </Link>
           )}

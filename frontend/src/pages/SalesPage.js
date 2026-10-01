@@ -37,7 +37,7 @@ import {
   TabsTrigger,
 } from "../components/ui/tabs";
 import { toast } from "sonner";
-import { Search, Receipt, FileText, CreditCard, XCircle, RotateCcw, Banknote, Smartphone, CalendarDays, X, FileSpreadsheet, Printer, Pencil, Undo2 } from "lucide-react";
+import { Search, Receipt, FileText, CreditCard, XCircle, RotateCcw, Banknote, Smartphone, CalendarDays, X, FileSpreadsheet, Printer, Pencil, Undo2, Truck } from "lucide-react";
 
 const SalesPage = () => {
   const confirm = useConfirm();
@@ -306,6 +306,13 @@ const SalesPage = () => {
                               <FileText className="w-4 h-4" />
                             </Button>
                           </Link>
+                          {sale.status !== 'cancelled' && (
+                            <Link to={`/delivery/${sale.id}`}>
+                              <Button variant="ghost" size="sm" className="text-emerald-700" title="Bon de livraison" data-testid={`delivery-sale-${sale.id}`}>
+                                <Truck className="w-4 h-4" />
+                              </Button>
+                            </Link>
+                          )}
                           {sale.status !== 'cancelled' && sale.balance_due > 0 && (
                             <Button 
                               variant="ghost" 

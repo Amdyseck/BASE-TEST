@@ -28,6 +28,7 @@ import SupplierInvoicePage from "./pages/SupplierInvoicePage";
 import AccountLedgerPage from "./pages/AccountLedgerPage";
 import ReturnsPage from "./pages/ReturnsPage";
 import ReturnDocumentPage from "./pages/ReturnDocumentPage";
+import DeliveryNotePage from "./pages/DeliveryNotePage";
 import { SettingsProvider } from "./contexts/SettingsContext";
 import { ConfirmProvider } from "./contexts/ConfirmContext";
 import Layout from "./components/Layout";
@@ -100,6 +101,11 @@ function App() {
           <Route path="/return/:returnId" element={
             <ProtectedRoute>
               <ReturnDocumentPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/delivery/:saleId" element={
+            <ProtectedRoute module="sales">
+              <DeliveryNotePage />
             </ProtectedRoute>
           } />
           <Route path="/accounts/:type/:id" element={
