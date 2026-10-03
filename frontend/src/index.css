@@ -91,8 +91,16 @@ code {
 
 /* Data tables styling */
 .data-table td {
-    @apply font-mono text-sm;
+    @apply font-mono text-sm leading-tight;
 }
+
+/* Lignes compactes dans tous les documents imprimables */
+.purchase-sheet table td, .purchase-sheet table th, .invoice-table td, .invoice-table th {
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
+    line-height: 1.2;
+}
+.purchase-sheet .border-b, .invoice-table tr { border-bottom-width: 1px; }
 
 .data-table th {
     @apply uppercase text-xs tracking-widest font-medium text-slate-500;

@@ -33,7 +33,9 @@ const PeriodBar = ({ start, end, setStart, setEnd, children, exportUrl, exportNa
 
 const emptyLine = () => ({ account: "", aux_id: "", debit: "", credit: "" });
 
-const ManualEntryDialog = ({ open, onOpenChange, plan, onCreated }) => {
+const JOURNAL_DEFAULT_ACCOUNT = { CA: "571", BQ: "521" };
+const ManualEntryDialog = ({ open, onOpenChange, plan, onCreated, defaultJournal = "OD" }) => {
+  const [journal, setJournal] = useState(defaultJournal);
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [label, setLabel] = useState("");
   const [lines, setLines] = useState([emptyLine(), emptyLine()]);
@@ -42,8 +44,12 @@ const ManualEntryDialog = ({ open, onOpenChange, plan, onCreated }) => {
   useEffect(() => {
     if (!open) return;
     Promise.all([api.get("/customers"), api.get("/suppliers")]).then(([c, s]) => setTiers({ customers: c.data, suppliers: s.data })).catch(() => {});
-    setLabel(""); setLines([emptyLine(), emptyLine()]); setDate(new Date().toISOString().slice(0, 10));
+    const j = defaultJournal || "OD";
+    setJournal(j); setLabel(""); setDate(new Date().toISOString().slice(0, 10));
+    setLines([{ ...emptyLine(), account: JOURNAL_DEFAULT_ACCOUNT[j] || "" }, emptyLine()]);
+    // eslint-disable-next-line
   }, [open]);
+  const changeJournal = (j) => { setJournal(j); setLines([{ ...lines[0], account: JOURNAL_DEFAULT_ACCOUNT[j] || lines[0].account }, ...lines.slice(1)]); };
   const setLine = (i, p) => setLines(lines.map((l, j) => (j === i ? { ...l, ...p } : l)));
   const num = (v) => parseFloat(String(v).replace(",", ".")) || 0;
   const debit = lines.reduce((a, l) => a + num(l.debit), 0), credit = lines.reduce((a, l) => a + num(l.credit), 0);
@@ -52,15 +58,18 @@ const ManualEntryDialog = ({ open, onOpenChange, plan, onCreated }) => {
   const submit = async () => {
     setSaving(true);
     try {
-      const r = await api.post("/accounting/entries", { date, label, lines: lines.filter((l) => l.account).map((l) => ({ account: l.account, aux_id: l.aux_id || null, debit: num(l.debit), credit: num(l.credit) })) });
+      const r = await api.post("/accounting/entries", { date, label, journal, lines: lines.filter((l) => l.account).map((l) => ({ account: l.account, aux_id: l.aux_id || null, debit: num(l.debit), credit: num(l.credit) })) });
       toast.success(`Écriture ${r.data.piece} enregistrée`); onOpenChange(false); onCreated();
     } catch (e) { toast.error(e.response?.data?.detail || "Erreur lors de l'enregistrement"); } finally { setSaving(false); }
   };
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl" data-testid="manual-entry-dialog">
-        <DialogHeader><DialogTitle className="font-[Chivo]">Nouvelle écriture — Opérations diverses (OD)</DialogTitle></DialogHeader>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <DialogHeader><DialogTitle className="font-[Chivo]">Nouvelle écriture — {journal === "CA" ? "Journal de caisse" : journal === "BQ" ? "Journal de banque" : "Opérations diverses (OD)"}</DialogTitle></DialogHeader>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div><Label className="overline">Journal</Label>
+            <Select value={journal} onValueChange={changeJournal}><SelectTrigger className="rounded-sm h-9" data-testid="od-journal"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="OD">OD — Opérations diverses</SelectItem><SelectItem value="CA">CA — Caisse</SelectItem><SelectItem value="BQ">BQ — Banque</SelectItem></SelectContent></Select></div>
           <div><Label className="overline">Date</Label><Input type="date" value={date} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setDate(e.target.value)} className="rounded-sm h-9" data-testid="od-date" /></div>
           <div className="md:col-span-2"><Label className="overline">Libellé</Label><Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Ex. Régularisation, frais bancaires…" className="rounded-sm h-9" data-testid="od-label" /></div>
         </div>
@@ -104,8 +113,8 @@ const JournalsTab = ({ start, end, setStart, setEnd, plan }) => {
   };
   return (
     <div className="space-y-4">
-      <ManualEntryDialog open={odOpen} onOpenChange={setOdOpen} plan={plan} onCreated={load} />
-      <PeriodBar start={start} end={end} setStart={setStart} setEnd={setEnd} exportUrl={`/accounting/export/journals.xlsx?${q}`} exportName={`journal_${journal}.xlsx`} actions={<>{isManager && <Button className="btn-accent h-9" onClick={() => setOdOpen(true)} data-testid="new-od-btn"><Plus className="w-4 h-4 mr-2" /> Écriture OD</Button>}<Button variant="outline" className="rounded-sm h-9" onClick={() => downloadFile(`/accounting/export/fec?start=${start}&end=${end}`, "FEC.txt")} title="Fichier des écritures comptables (format normalisé, séparateur |)" data-testid="fec-export-btn"><FileDown className="w-4 h-4 mr-2" /> Export FEC</Button></>}>
+      <ManualEntryDialog open={odOpen} onOpenChange={setOdOpen} plan={plan} onCreated={load} defaultJournal={["CA", "BQ"].includes(journal) ? journal : "OD"} />
+      <PeriodBar start={start} end={end} setStart={setStart} setEnd={setEnd} exportUrl={`/accounting/export/journals.xlsx?${q}`} exportName={`journal_${journal}.xlsx`} actions={<>{isManager && <Button className="btn-accent h-9" onClick={() => setOdOpen(true)} data-testid="new-od-btn"><Plus className="w-4 h-4 mr-2" /> {journal === "CA" ? "Opération de caisse" : journal === "BQ" ? "Opération de banque" : "Nouvelle écriture"}</Button>}<Button variant="outline" className="rounded-sm h-9" onClick={() => downloadFile(`/accounting/export/fec?start=${start}&end=${end}`, "FEC.txt")} title="Fichier des écritures comptables (format normalisé, séparateur |)" data-testid="fec-export-btn"><FileDown className="w-4 h-4 mr-2" /> Export FEC</Button></>}>
         <div><Label className="overline">Journal</Label>
           <Select value={journal} onValueChange={setJournal}><SelectTrigger className="rounded-sm h-9 w-56" data-testid="journal-select"><SelectValue /></SelectTrigger>
             <SelectContent><SelectItem value="all">Tous les journaux</SelectItem>{plan.journals.map((j) => <SelectItem key={j.code} value={j.code}>{j.code} — {j.label}</SelectItem>)}</SelectContent></Select></div>

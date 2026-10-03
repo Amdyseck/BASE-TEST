@@ -39,6 +39,7 @@ const CashPage = () => {
   const [session, setSession] = useState(null);
   const [summary, setSummary] = useState(null);
   const [movements, setMovements] = useState([]);
+  const [filterDate, setFilterDate] = useState("");
   const [movSummary, setMovSummary] = useState({ total_in: 0, total_out: 0, net: 0 });
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -61,11 +62,13 @@ const CashPage = () => {
     };
   }, []);
 
+  useEffect(() => { fetchAll(true); /* eslint-disable-next-line */ }, [filterDate]);
+
   const fetchAll = async (silent = false) => {
     try {
       const [cur, mov, hist] = await Promise.all([
         api.get("/cash/session/current"),
-        api.get("/cash/movements"),
+        api.get(filterDate ? `/cash/movements?date=${filterDate}` : "/cash/movements"),
         api.get("/cash/sessions"),
       ]);
       setSession(cur.data.session);
@@ -134,7 +137,7 @@ const CashPage = () => {
 
   const handleExport = async () => {
     try {
-      await downloadFile(session ? `/export/cash/movements.xlsx?session_id=${session.id}` : "/export/cash/movements.xlsx", "journal_caisse.xlsx");
+      await downloadFile(filterDate ? `/export/cash/movements.xlsx?date=${filterDate}` : session ? `/export/cash/movements.xlsx?session_id=${session.id}` : "/export/cash/movements.xlsx", "journal_caisse.xlsx");
     } catch (error) {
       toast.error("Erreur lors de l'export");
     }
@@ -232,12 +235,23 @@ const CashPage = () => {
         </TabsContent>
 
         <TabsContent value="movements" className="mt-4 space-y-4">
-          <div className="flex justify-end gap-2 no-print">
+          <div className="flex flex-wrap items-end justify-between gap-2 no-print">
+            <div className="flex items-end gap-2">
+              <div>
+                <Label className="overline block mb-1">Situation du jour</Label>
+                <Input type="date" value={filterDate} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setFilterDate(e.target.value)} className="rounded-sm h-9 bg-white" data-testid="cash-date-filter" />
+              </div>
+              <Button variant="outline" size="sm" className="rounded-sm h-9" onClick={() => setFilterDate(new Date().toISOString().slice(0, 10))} data-testid="cash-today-btn">Aujourd'hui</Button>
+              {filterDate && <Button variant="ghost" size="sm" className="rounded-sm h-9" onClick={() => setFilterDate("")} data-testid="cash-session-view-btn">Session en cours</Button>}
+              {filterDate && <span className="text-xs text-slate-500 pb-2" data-testid="cash-date-label">Journée du {new Date(filterDate + "T12:00:00").toLocaleDateString("fr-FR")} — {movements.length} opération{movements.length > 1 ? "s" : ""}</span>}
+            </div>
+            <div className="flex gap-2">
             <Button variant="outline" size="sm" className="rounded-sm" onClick={handleExport} data-testid="export-cash-excel-btn"><FileSpreadsheet className="w-4 h-4 mr-2" /> Excel</Button>
             <Button variant="outline" size="sm" className="rounded-sm" onClick={() => window.print()} data-testid="print-cash-btn"><Printer className="w-4 h-4 mr-2" /> PDF / Imprimer</Button>
             {session && (
               <Link to={`/cash/ticket/${session.id}`}><Button variant="outline" size="sm" className="rounded-sm" data-testid="current-ticket-btn"><Receipt className="w-4 h-4 mr-2" /> Ticket</Button></Link>
             )}
+            </div>
           </div>
           <div className="grid grid-cols-3 gap-4">
             <Card className="stat-card"><CardContent className="pt-4"><p className="stat-card-label">Débit (entrées)</p><p className="stat-card-value text-green-700">{formatCurrency(movSummary.total_in)}</p></CardContent></Card>

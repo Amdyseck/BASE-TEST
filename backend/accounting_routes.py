@@ -162,7 +162,7 @@ async def build_entries() -> List[dict]:
             entries.append(_entry(f"ret:{r['id']}:adv", r["created_at"], "OD", r["number"], f"Avoir conservé en avance — {aux['aux_name']}", adv_lines, "return", r["id"]))
 
     for me in await db.manual_entries.find({}, {"_id": 0}).to_list(50000):
-        entries.append(_entry(f"manual:{me['id']}", me["date"], "OD", me["piece"], me["label"], me["lines"], "manual", me["id"]))
+        entries.append(_entry(f"manual:{me['id']}", me["date"], me.get("journal", "OD"), me["piece"], me["label"], me["lines"], "manual", me["id"]))
 
     entries.sort(key=lambda e: e["date"])
     return entries
@@ -319,6 +319,7 @@ class ManualEntryCreate(BaseModel):
     date: str  # YYYY-MM-DD
     label: str
     lines: List[ManualLine]
+    journal: str = "OD"  # OD | CA | BQ
 
 
 @router.post("/accounting/entries")
@@ -349,10 +350,18 @@ async def create_manual_entry(data: ManualEntryCreate, user: dict = Depends(requ
     debit, credit = round(sum(l.debit for l in lines), 2), round(sum(l.credit for l in lines), 2)
     if abs(debit - credit) > 0.01:
         raise HTTPException(status_code=400, detail=f"Écriture déséquilibrée : débit {debit:g} ≠ crédit {credit:g}")
+    if data.journal not in ("OD", "CA", "BQ"):
+        raise HTTPException(status_code=400, detail="Journal invalide (OD, CA ou BQ)")
+    if data.journal == "CA" and not any(l.account in TREASURY for l in lines):
+        raise HTTPException(status_code=400, detail="Une opération de caisse doit mouvementer un compte de caisse (571, 5721, 5722)")
+    if data.journal == "BQ" and not any(l.account in ("521", "513") for l in lines):
+        raise HTTPException(status_code=400, detail="Une opération de banque doit mouvementer le compte 521 ou 513")
     now = datetime.now(timezone.utc)
+    seq_key = "manual_entry" if data.journal == "OD" else f"manual_entry_{data.journal}"
     doc = {
         "id": str(uuid.uuid4()),
-        "piece": f"OD{str(await next_sequence('manual_entry')).zfill(7)}",
+        "journal": data.journal,
+        "piece": f"{data.journal}{str(await next_sequence(seq_key)).zfill(7)}",
         "date": datetime.combine(datetime.strptime(data.date[:10], "%Y-%m-%d").date(), now.time(), tzinfo=timezone.utc).isoformat(),
         "label": data.label.strip(),
         "lines": [l.model_dump() for l in lines],

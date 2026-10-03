@@ -138,22 +138,22 @@ const InvoicePage = () => {
       </div>
 
       {/* Items table */}
-      <table className={`invoice-table w-full ${lg ? "mb-6" : "mb-3"} ${txt}`} data-testid={lg ? "invoice-items-table" : undefined}>
+      <table className={`invoice-table w-full ${lg ? "mb-4" : "mb-2"} ${txt} leading-tight`} data-testid={lg ? "invoice-items-table" : undefined}>
         <thead>
           <tr className="bg-slate-100">
-            <th className="w-1/2 text-left py-1.5 px-2">Désignation</th>
-            <th className="text-right py-1.5 px-2">{lg ? "Quantité" : "Qté"}</th>
-            <th className="text-right py-1.5 px-2">{lg ? "Prix unitaire" : "P.U."}</th>
-            <th className="text-right py-1.5 px-2">Total</th>
+            <th className="text-center py-1 px-2 w-20">{lg ? "Quantité" : "Qté"}</th>
+            <th className="w-1/2 text-left py-1 px-2">Désignation</th>
+            <th className="text-right py-1 px-2">{lg ? "Prix unitaire" : "P.U."}</th>
+            <th className="text-right py-1 px-2">Total</th>
           </tr>
         </thead>
         <tbody>
           {sale.items.map((item, index) => (
-            <tr key={index}>
-              <td className="py-1 px-2">{item.product_name}</td>
-              <td className="text-right py-1 px-2">{item.quantity}</td>
-              <td className="text-right py-1 px-2">{formatCurrency(item.unit_price)}</td>
-              <td className="text-right py-1 px-2">{formatCurrency(item.total)}</td>
+            <tr key={index} className="border-b border-slate-100">
+              <td className="text-center py-0.5 px-2 font-medium">{item.quantity}</td>
+              <td className="py-0.5 px-2">{item.product_name}</td>
+              <td className="text-right py-0.5 px-2">{formatCurrency(item.unit_price)}</td>
+              <td className="text-right py-0.5 px-2">{formatCurrency(item.total)}</td>
             </tr>
           ))}
         </tbody>
@@ -172,7 +172,7 @@ const InvoicePage = () => {
               <span className="font-mono">-{formatCurrency(sale.discount)}</span>
             </div>
           )}
-          <div className={`flex justify-between ${lg ? "py-3 px-3" : "py-2 px-2"} bg-slate-900 text-white rounded-sm mt-2`}>
+          <div className={`flex justify-between ${lg ? "py-2 px-3" : "py-1.5 px-2"} bg-slate-900 text-white rounded-sm mt-2`}>
             <span className="font-bold">TOTAL</span>
             <span className={`font-mono font-bold ${lg ? "text-lg" : ""}`} data-testid={lg ? "invoice-total" : undefined}>{formatCurrency(sale.total)}</span>
           </div>
