@@ -29,6 +29,7 @@ import AccountLedgerPage from "./pages/AccountLedgerPage";
 import ReturnsPage from "./pages/ReturnsPage";
 import ReturnDocumentPage from "./pages/ReturnDocumentPage";
 import DeliveryNotePage from "./pages/DeliveryNotePage";
+import AccountingPage from "./pages/AccountingPage";
 import { SettingsProvider } from "./contexts/SettingsContext";
 import { ConfirmProvider } from "./contexts/ConfirmContext";
 import Layout from "./components/Layout";
@@ -133,6 +134,7 @@ function App() {
             <Route path="depots" element={<ProtectedRoute module="depots"><DepotsPage /></ProtectedRoute>} />
             <Route path="bank-journal" element={<ProtectedRoute module="bank"><BankJournalPage /></ProtectedRoute>} />
             <Route path="accounts" element={<ProtectedRoute module="accounts"><AccountsPage /></ProtectedRoute>} />
+            <Route path="accounting" element={<ProtectedRoute module="accounts"><AccountingPage /></ProtectedRoute>} />
             <Route path="cash" element={<ProtectedRoute module="cash"><CashPage /></ProtectedRoute>} />
             <Route path="reports" element={<ProtectedRoute module="reports"><ReportsPage /></ProtectedRoute>} />
             <Route path="users" element={

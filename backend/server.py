@@ -1810,11 +1810,13 @@ def _include_extra_routes():
     from ledger_backup_routes import router as ledger_router
     from files_routes import router as files_router
     from returns_routes import router as returns_router
+    from accounting_routes import router as accounting_router
     api_router.include_router(extra_router)
     api_router.include_router(export_router)
     api_router.include_router(ledger_router)
     api_router.include_router(files_router)
     api_router.include_router(returns_router)
+    api_router.include_router(accounting_router)
 
 _include_extra_routes()
 app.include_router(api_router)

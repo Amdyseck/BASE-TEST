@@ -27,6 +27,7 @@ import {
   ClipboardCheck,
   ChevronDown,
   Undo2,
+  BookOpen,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import {
@@ -67,6 +68,9 @@ const Layout = () => {
     { key: "rapport", label: "RAPPORT", icon: BarChart3, items: [
       { to: "/reports", icon: BarChart3, label: "Rapports", module: "reports" },
       { to: "/accounts", icon: Wallet, label: "Comptes tiers", module: "accounts" },
+    ] },
+    { key: "compta", label: "COMPTABILITÉ", icon: BookOpen, items: [
+      { to: "/accounting", icon: BookOpen, label: "Journaux, comptes & lettrage", module: "accounts" },
     ] },
     { key: "inventaire", label: "INVENTAIRE", icon: Package, items: [
       { to: "/products", icon: Package, label: "Produits", module: "products" },
