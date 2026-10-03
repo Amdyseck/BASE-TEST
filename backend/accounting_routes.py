@@ -477,3 +477,137 @@ async def export_ledger(start: Optional[str] = None, end: Optional[str] = None, 
             rows.append(["", "", _fr(l["date"][:10]), l["journal"], l["piece"], l["label"], l["aux_name"], l["debit"] or "", l["credit"] or "", l["balance"], l["lettre"] or ""])
         rows.append(["", f"Total {a['account']}", "", "", "", "", "", a["debit"], a["credit"], a["balance"], ""])
     return build_workbook("Grand livre", ["Compte", "Intitulé", "Date", "Jnl", "Pièce", "Libellé", "Tiers", "Débit", "Crédit", "Solde", "Lettre"], rows, (await load_settings())["name"], _period_label(start, end))
+
+
+# ==================== COMPTE DE RÉSULTAT ====================
+
+async def build_income_statement(start: Optional[str], end: Optional[str]) -> dict:
+    bal = await balance(start, end, None)
+    rows = {r["account"]: r for r in bal["rows"]}
+    def net(acc, sign):  # sign +1 : solde créditeur (produit), -1 : solde débiteur (charge)
+        r = rows.get(acc)
+        return round(sign * (r["credit"] - r["debit"]), 2) if r else 0.0
+    ventes = net("701", 1)
+    remises = net("7019", -1)
+    retours = net("7071", -1)
+    ventes_nettes = round(ventes - remises - retours, 2)
+    achats = net("601", -1)
+    charges = net("658", -1)
+    marge = round(ventes_nettes - achats, 2)
+    resultat = round(marge - charges, 2)
+    return {
+        "produits": [
+            {"account": "701", "label": ACCOUNTS["701"], "amount": ventes},
+            {"account": "7019", "label": ACCOUNTS["7019"], "amount": -remises},
+            {"account": "7071", "label": ACCOUNTS["7071"], "amount": -retours},
+        ],
+        "ventes_nettes": ventes_nettes,
+        "charges": [
+            {"account": "601", "label": ACCOUNTS["601"] + " (net des retours)", "amount": achats},
+            {"account": "658", "label": ACCOUNTS["658"], "amount": charges},
+        ],
+        "total_charges": round(achats + charges, 2),
+        "marge_commerciale": marge,
+        "resultat": resultat,
+        "taux_marge": round(marge / ventes_nettes * 100, 1) if ventes_nettes else 0,
+    }
+
+
+@router.get("/accounting/income-statement")
+async def income_statement(start: Optional[str] = None, end: Optional[str] = None, user: dict = Depends(require_module("accounts"))):
+    return await build_income_statement(start, end)
+
+
+@router.get("/accounting/export/income-statement.xlsx")
+async def export_income_statement(start: Optional[str] = None, end: Optional[str] = None, user: dict = Depends(require_module("accounts"))):
+    d = await build_income_statement(start, end)
+    rows = [["PRODUITS", "", ""]] + [[p["account"], p["label"], p["amount"]] for p in d["produits"]] + [["", "Ventes nettes", d["ventes_nettes"]], ["", "", ""], ["CHARGES", "", ""]] + [[c["account"], c["label"], c["amount"]] for c in d["charges"]] + [["", "Total charges", d["total_charges"]], ["", "", ""], ["", "Marge commerciale", d["marge_commerciale"]], ["", "RÉSULTAT DE LA PÉRIODE", d["resultat"]]]
+    return build_workbook("Compte de résultat", ["Compte", "Rubrique", "Montant"], rows, (await load_settings())["name"], _period_label(start, end))
+
+
+# ==================== RAPPROCHEMENT BANCAIRE (521) ====================
+
+class PointageToggle(BaseModel):
+    line_id: str
+    statement_ref: Optional[str] = ""
+
+
+class StatementBalance(BaseModel):
+    statement_balance: float
+    statement_date: Optional[str] = None
+
+
+@router.get("/accounting/bank-reconciliation")
+async def bank_reconciliation(start: Optional[str] = None, end: Optional[str] = None, user: dict = Depends(require_module("accounts"))):
+    pointed = {p["line_id"]: p async for p in db.bank_pointage.find({}, {"_id": 0})}
+    lines, opening = [], 0.0
+    for e in await build_entries():
+        for l in e["lines"]:
+            if l["account"] != "521":
+                continue
+            if start and e["date"][:10] < start[:10]:
+                opening = round(opening + l["debit"] - l["credit"], 2)
+                continue
+            if end and e["date"][:10] > end[:10]:
+                continue
+            p = pointed.get(l["line_id"])
+            lines.append({**l, "date": e["date"], "journal": e["journal"], "piece": e["piece"], "label": e["label"], "pointed": bool(p), "statement_ref": (p or {}).get("statement_ref", ""), "pointed_by": (p or {}).get("pointed_by")})
+    running = opening
+    for l in lines:
+        running = round(running + l["debit"] - l["credit"], 2)
+        l["balance"] = running
+    all_pointed = round(sum(p["debit"] - p["credit"] for p in pointed.values()), 2)
+    st = await db.settings.find_one({"key": "bank_reconciliation"}, {"_id": 0, "key": 0}) or {}
+    unpointed = round(sum(l["debit"] - l["credit"] for l in lines if not l["pointed"]), 2)
+    return {"opening": opening, "lines": lines, "book_balance": running, "pointed_balance": all_pointed, "unpointed_period": unpointed,
+            "statement_balance": st.get("statement_balance"), "statement_date": st.get("statement_date"),
+            "gap": round((st.get("statement_balance") or 0) - all_pointed, 2) if st.get("statement_balance") is not None else None}
+
+
+@router.post("/accounting/bank-reconciliation/toggle")
+async def toggle_pointage(data: PointageToggle, user: dict = Depends(require_module("accounts"))):
+    existing = await db.bank_pointage.find_one({"line_id": data.line_id})
+    if existing:
+        await db.bank_pointage.delete_one({"line_id": data.line_id})
+        return {"pointed": False}
+    line = next((l for e in await build_entries() for l in e["lines"] if l["line_id"] == data.line_id and l["account"] == "521"), None)
+    if not line:
+        raise HTTPException(status_code=404, detail="Ligne bancaire introuvable")
+    await db.bank_pointage.insert_one({"line_id": data.line_id, "debit": line["debit"], "credit": line["credit"], "statement_ref": data.statement_ref or "", "pointed_by": user["name"], "pointed_at": datetime.now(timezone.utc).isoformat()})
+    return {"pointed": True}
+
+
+@router.put("/accounting/bank-reconciliation/statement")
+async def set_statement_balance(data: StatementBalance, user: dict = Depends(require_module("accounts"))):
+    doc = {"statement_balance": data.statement_balance, "statement_date": data.statement_date, "updated_by": user["name"], "updated_at": datetime.now(timezone.utc).isoformat()}
+    await db.settings.update_one({"key": "bank_reconciliation"}, {"$set": doc}, upsert=True)
+    return doc
+
+
+# ==================== EXPORT FEC (format normalisé) ====================
+
+@router.get("/accounting/export/fec")
+async def export_fec(start: Optional[str] = None, end: Optional[str] = None, user: dict = Depends(require_module("accounts"))):
+    from fastapi.responses import Response
+    letters = {}
+    async for l in db.lettrage.find({}, {"_id": 0}):
+        for lid in l["line_ids"]:
+            letters[lid] = (l["code"], l["created_at"][:10].replace("-", ""))
+    def amt(v):
+        return f"{v:.2f}".replace(".", ",")
+    header = ["JournalCode", "JournalLib", "EcritureNum", "EcritureDate", "CompteNum", "CompteLib", "CompAuxNum", "CompAuxLib", "PieceRef", "PieceDate", "EcritureLib", "Debit", "Credit", "EcritureLet", "DateLet", "ValidDate", "Montantdevise", "Idevise"]
+    out = ["|".join(header)]
+    num = 0
+    for e in await build_entries():
+        if not _in_period(e["date"], start, end):
+            continue
+        num += 1
+        d = e["date"][:10].replace("-", "")
+        for l in e["lines"]:
+            let, dlet = letters.get(l["line_id"], ("", ""))
+            aux = l.get("aux_id") or ""
+            out.append("|".join([e["journal"], JOURNALS[e["journal"]], str(num), d, l["account"], l["account_label"], aux[:8].upper() if aux else "", (l.get("aux_name") or "").replace("|", " "), (e["piece"] or str(num)).replace("|", " "), d, e["label"].replace("|", " ").replace("\n", " "), amt(l["debit"]), amt(l["credit"]), let, dlet, d, "", "XOF"]))
+    settings = await load_settings()
+    slug = "".join(ch for ch in settings["name"] if ch.isalnum())[:20] or "SOCIETE"
+    filename = f"{slug}FEC{(end or datetime.now(timezone.utc).date().isoformat()).replace('-', '')}.txt"
+    return Response(content="\n".join(out).encode("utf-8"), media_type="text/plain; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{filename}"'})

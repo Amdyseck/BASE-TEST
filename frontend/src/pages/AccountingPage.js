@@ -12,7 +12,7 @@ import { Checkbox } from "../components/ui/checkbox";
 import { toast } from "sonner";
 import { downloadFile } from "../lib/download";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
-import { BookOpen, Printer, Link2, Unlink, Wand2, FileSpreadsheet, Plus, Trash2, Lock, Unlock } from "lucide-react";
+import { BookOpen, Printer, Link2, Unlink, Wand2, FileSpreadsheet, Plus, Trash2, Lock, Unlock, FileDown, Landmark } from "lucide-react";
 
 const money = (a) => new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 0 }).format(a || 0);
 const fdate = (d) => new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -105,7 +105,7 @@ const JournalsTab = ({ start, end, setStart, setEnd, plan }) => {
   return (
     <div className="space-y-4">
       <ManualEntryDialog open={odOpen} onOpenChange={setOdOpen} plan={plan} onCreated={load} />
-      <PeriodBar start={start} end={end} setStart={setStart} setEnd={setEnd} exportUrl={`/accounting/export/journals.xlsx?${q}`} exportName={`journal_${journal}.xlsx`} actions={isManager && <Button className="btn-accent h-9" onClick={() => setOdOpen(true)} data-testid="new-od-btn"><Plus className="w-4 h-4 mr-2" /> Écriture OD</Button>}>
+      <PeriodBar start={start} end={end} setStart={setStart} setEnd={setEnd} exportUrl={`/accounting/export/journals.xlsx?${q}`} exportName={`journal_${journal}.xlsx`} actions={<>{isManager && <Button className="btn-accent h-9" onClick={() => setOdOpen(true)} data-testid="new-od-btn"><Plus className="w-4 h-4 mr-2" /> Écriture OD</Button>}<Button variant="outline" className="rounded-sm h-9" onClick={() => downloadFile(`/accounting/export/fec?start=${start}&end=${end}`, "FEC.txt")} title="Fichier des écritures comptables (format normalisé, séparateur |)" data-testid="fec-export-btn"><FileDown className="w-4 h-4 mr-2" /> Export FEC</Button></>}>
         <div><Label className="overline">Journal</Label>
           <Select value={journal} onValueChange={setJournal}><SelectTrigger className="rounded-sm h-9 w-56" data-testid="journal-select"><SelectValue /></SelectTrigger>
             <SelectContent><SelectItem value="all">Tous les journaux</SelectItem>{plan.journals.map((j) => <SelectItem key={j.code} value={j.code}>{j.code} — {j.label}</SelectItem>)}</SelectContent></Select></div>
@@ -160,6 +160,84 @@ const LedgerTab = ({ start, end, setStart, setEnd }) => {
         </Card>
       ))}
       {data && <div className="bg-slate-900 text-white p-3 rounded-sm flex justify-between font-bold"><span>TOTAL GÉNÉRAL</span><span className="font-mono" data-testid="ledger-total">Débit {money(data.totals.debit)} · Crédit {money(data.totals.credit)}</span></div>}
+    </div>
+  );
+};
+
+const IncomeTab = ({ start, end, setStart, setEnd }) => {
+  const [d, setD] = useState(null);
+  useEffect(() => { api.get(`/accounting/income-statement?start=${start}&end=${end}`).then((r) => setD(r.data)).catch(() => toast.error("Erreur de chargement du compte de résultat")); }, [start, end]);
+  const Row = ({ acc, label, amount, bold, cls = "" }) => (
+    <TableRow className={`table-row ${bold ? "font-bold bg-slate-50" : ""} ${cls}`}><TableCell className="font-mono">{acc}</TableCell><TableCell>{label}</TableCell><TableCell className={`text-right font-mono ${amount < 0 ? "text-red-600" : ""}`}>{money(amount)}</TableCell></TableRow>
+  );
+  return (
+    <div className="space-y-4">
+      <PeriodBar start={start} end={end} setStart={setStart} setEnd={setEnd} exportUrl={`/accounting/export/income-statement.xlsx?start=${start}&end=${end}`} exportName="compte_de_resultat.xlsx" />
+      {!d ? <div className="flex justify-center py-10"><div className="spinner" /></div> : (
+        <Card className="table-container max-w-4xl" data-testid="income-statement">
+          <div className="px-4 py-3 bg-slate-900 text-white font-[Chivo] font-bold">Compte de résultat — période du {fdate(start)} au {fdate(end)}</div>
+          <Table className="data-table">
+            <TableHeader className="table-header"><TableRow><TableHead className="w-24">Compte</TableHead><TableHead>Rubrique</TableHead><TableHead className="text-right">Montant</TableHead></TableRow></TableHeader>
+            <TableBody>
+              <TableRow className="bg-green-50"><TableCell colSpan={3} className="font-bold text-green-800 uppercase text-xs tracking-wide">Produits (classe 7)</TableCell></TableRow>
+              {d.produits.map((p) => <Row key={p.account} acc={p.account} label={p.label} amount={p.amount} />)}
+              <Row acc="" label="Ventes nettes" amount={d.ventes_nettes} bold />
+              <TableRow className="bg-red-50"><TableCell colSpan={3} className="font-bold text-red-800 uppercase text-xs tracking-wide">Charges (classe 6)</TableCell></TableRow>
+              {d.charges.map((c) => <Row key={c.account} acc={c.account} label={c.label} amount={c.amount} />)}
+              <Row acc="" label="Total charges" amount={d.total_charges} bold />
+              <Row acc="" label={`Marge commerciale (taux ${d.taux_marge} %)`} amount={d.marge_commerciale} bold />
+              <TableRow className={`font-bold text-white ${d.resultat >= 0 ? "bg-green-700" : "bg-red-700"}`}><TableCell></TableCell><TableCell className="text-base">{d.resultat >= 0 ? "BÉNÉFICE" : "PERTE"} DE LA PÉRIODE</TableCell><TableCell className="text-right font-mono text-lg" data-testid="income-result">{money(d.resultat)}</TableCell></TableRow>
+            </TableBody>
+          </Table>
+          <p className="px-4 py-2 text-xs text-slate-500">Résultat = ventes nettes (701 − remises 7019 − retours 7071) − achats de marchandises (601) − charges diverses (658). Inventaire intermittent : la variation de stock n'est pas prise en compte.</p>
+        </Card>
+      )}
+    </div>
+  );
+};
+
+const BankReconciliationTab = ({ start, end, setStart, setEnd }) => {
+  const [d, setD] = useState(null);
+  const [stmt, setStmt] = useState("");
+  const [stmtDate, setStmtDate] = useState("");
+  const [ref, setRef] = useState("");
+  const load = useCallback(() => api.get(`/accounting/bank-reconciliation?start=${start}&end=${end}`).then((r) => { setD(r.data); setStmt(r.data.statement_balance ?? ""); setStmtDate(r.data.statement_date || ""); }).catch(() => toast.error("Erreur de chargement")), [start, end]);
+  useEffect(() => { load(); }, [load]);
+  const toggle = async (lid) => { try { await api.post("/accounting/bank-reconciliation/toggle", { line_id: lid, statement_ref: ref }); load(); } catch (e) { toast.error(e.response?.data?.detail || "Erreur"); } };
+  const saveStmt = async () => { try { await api.put("/accounting/bank-reconciliation/statement", { statement_balance: parseFloat(String(stmt).replace(",", ".")) || 0, statement_date: stmtDate || null }); toast.success("Solde du relevé enregistré"); load(); } catch { toast.error("Erreur"); } };
+  return (
+    <div className="space-y-4">
+      <PeriodBar start={start} end={end} setStart={setStart} setEnd={setEnd}>
+        <div><Label className="overline">Réf. relevé (pointage)</Label><Input value={ref} onChange={(e) => setRef(e.target.value)} placeholder="Ex. RLV 06/2026" className="rounded-sm h-9 w-40" data-testid="stmt-ref" /></div>
+        <div><Label className="overline">Solde du relevé bancaire</Label><Input value={stmt} onChange={(e) => setStmt(e.target.value)} inputMode="decimal" className="rounded-sm h-9 w-40 font-mono" data-testid="stmt-balance" /></div>
+        <div><Label className="overline">Date du relevé</Label><Input type="date" value={stmtDate} onChange={(e) => setStmtDate(e.target.value)} className="rounded-sm h-9" /></div>
+        <Button variant="outline" className="rounded-sm h-9" onClick={saveStmt} data-testid="stmt-save-btn">Enregistrer le relevé</Button>
+      </PeriodBar>
+      {d && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[["Solde comptable 521", d.book_balance, "book"], ["Total pointé", d.pointed_balance, "pointed"], ["Non pointé (période)", d.unpointed_period, "unpointed"], ["Écart relevé − pointé", d.gap, "gap"]].map(([l, v, k]) => (
+            <Card key={k} className="stat-card"><div className="p-3"><p className="stat-card-label">{l}</p><p className={`stat-card-value text-lg ${v === null ? "text-slate-400" : k === "gap" ? (Math.abs(v) < 0.01 ? "text-green-700" : "text-orange-600") : v < 0 ? "text-red-600" : ""}`} data-testid={`bank-stat-${k}`}>{v === null ? "—" : money(v)}</p></div></Card>
+          ))}
+        </div>
+      )}
+      {d?.gap !== null && d?.gap !== undefined && <p className={`text-sm ${Math.abs(d.gap) < 0.01 ? "text-green-700" : "text-orange-700"}`} data-testid="bank-gap-msg">{Math.abs(d.gap) < 0.01 ? "✔ Rapprochement équilibré : le solde du relevé correspond aux lignes pointées." : "Écart à justifier : lignes non encore passées en banque ou opérations absentes de la comptabilité."}</p>}
+      <Card className="table-container">
+        <Table className="data-table">
+          <TableHeader className="table-header"><TableRow><TableHead className="w-10 no-print">Pointé</TableHead><TableHead>Date</TableHead><TableHead>Jnl</TableHead><TableHead>Pièce</TableHead><TableHead>Libellé</TableHead><TableHead>Tiers</TableHead><TableHead className="text-right">Débit</TableHead><TableHead className="text-right">Crédit</TableHead><TableHead className="text-right">Solde</TableHead><TableHead>Relevé</TableHead></TableRow></TableHeader>
+          <TableBody>
+            {!d ? <TableRow><TableCell colSpan={10} className="text-center py-10"><div className="spinner mx-auto" /></TableCell></TableRow>
+              : d.lines.length === 0 ? <TableRow><TableCell colSpan={10} className="text-center py-10 text-slate-400">Aucun mouvement bancaire sur la période</TableCell></TableRow>
+              : d.lines.map((l) => (
+                <TableRow key={l.line_id} className={`table-row ${l.pointed ? "bg-green-50/70" : ""}`} data-testid={`bank-line-${l.line_id}`}>
+                  <TableCell className="no-print"><Checkbox checked={l.pointed} onCheckedChange={() => toggle(l.line_id)} data-testid={`point-${l.line_id}`} /></TableCell>
+                  <TableCell className="text-slate-500 whitespace-nowrap">{fdate(l.date)}</TableCell><TableCell className="font-mono text-xs">{l.journal}</TableCell><TableCell className="font-mono text-xs">{l.piece}</TableCell><TableCell className="text-sm">{l.label}</TableCell><TableCell className="text-sm text-slate-600">{l.aux_name}</TableCell>
+                  <TableCell className="text-right font-mono">{l.debit ? money(l.debit) : ""}</TableCell><TableCell className="text-right font-mono">{l.credit ? money(l.credit) : ""}</TableCell><TableCell className={`text-right font-mono ${l.balance < 0 ? "text-red-600" : ""}`}>{money(l.balance)}</TableCell>
+                  <TableCell className="text-xs text-slate-500">{l.pointed ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-800 font-medium">✔ {l.statement_ref || "pointé"}</span> : ""}</TableCell>
+                </TableRow>
+              ))}
+          </TableBody>
+        </Table>
+      </Card>
     </div>
   );
 };
@@ -324,10 +402,14 @@ const AccountingPage = () => {
           <TabsTrigger value="account" className={tabCls} data-testid="tab-account">Interrogation & lettrage</TabsTrigger>
           <TabsTrigger value="ledger" className={tabCls} data-testid="tab-ledger">Grand livre</TabsTrigger>
           <TabsTrigger value="balance" className={tabCls} data-testid="tab-balance">Balance</TabsTrigger>
+          <TabsTrigger value="income" className={tabCls} data-testid="tab-income">Résultat</TabsTrigger>
+          <TabsTrigger value="bank" className={tabCls} data-testid="tab-bank"><Landmark className="w-3.5 h-3.5 mr-1" /> Rapprochement</TabsTrigger>
           <TabsTrigger value="plan" className={tabCls} data-testid="tab-plan">Plan comptable</TabsTrigger>
           <TabsTrigger value="closing" className={tabCls} data-testid="tab-closing">Clôture</TabsTrigger>
         </TabsList>
         <TabsContent value="ledger" className="mt-4"><LedgerTab {...period} /></TabsContent>
+        <TabsContent value="income" className="mt-4"><IncomeTab {...period} /></TabsContent>
+        <TabsContent value="bank" className="mt-4"><BankReconciliationTab {...period} /></TabsContent>
         <TabsContent value="closing" className="mt-4"><ClosingTab closing={closing} reload={loadClosing} /></TabsContent>
         <TabsContent value="journals" className="mt-4"><JournalsTab {...period} /></TabsContent>
         <TabsContent value="account" className="mt-4"><AccountTab {...period} /></TabsContent>
