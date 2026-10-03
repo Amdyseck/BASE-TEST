@@ -988,6 +988,16 @@ async def next_sequence(name: str) -> int:
 async def generate_invoice_number():
     return f"VTE{str(await next_sequence('sale')).zfill(7)}"
 
+async def assert_period_open(date_value):
+    """Refuse toute création/modification datée dans une période clôturée."""
+    doc = await db.settings.find_one({"key": "closing"}, {"_id": 0})
+    if not doc or not doc.get("closed_until"):
+        return
+    d = date_value.date().isoformat() if isinstance(date_value, datetime) else str(date_value or "")[:10]
+    if d and d <= doc["closed_until"]:
+        y, m, dd = doc["closed_until"].split("-")
+        raise HTTPException(status_code=400, detail=f"Période clôturée jusqu'au {dd}/{m}/{y} : aucune modification possible sur cette date")
+
 def parse_invoice_date(value: Optional[str]) -> Optional[datetime]:
     """Date choisie (YYYY-MM-DD) combinée à l'heure courante ; None si vide ou aujourd'hui."""
     if not value:
@@ -1089,6 +1099,7 @@ async def create_sale(sale_data: SaleBase, user: dict = Depends(require_module("
     )
     custom_dt = parse_invoice_date(sale_data.invoice_date)
     if custom_dt:
+        await assert_period_open(custom_dt)
         sale.created_at = custom_dt
     
     # Update stock for each item
@@ -1268,6 +1279,7 @@ async def cancel_sale(sale_id: str, user: dict = Depends(require_perm("can_cance
     
     if sale.get("status") == "cancelled":
         raise HTTPException(status_code=400, detail="Facture déjà annulée")
+    await assert_period_open(sale.get("created_at"))
     
     # Restore stock for each item
     for item in sale.get("items", []):
@@ -1395,6 +1407,9 @@ async def get_bank_journal(
 
 @api_router.delete("/bank-journal/{entry_id}")
 async def delete_bank_entry(entry_id: str, user: dict = Depends(require_perm("can_delete"))):
+    existing = await db.bank_journal.find_one({"id": entry_id}, {"_id": 0, "created_at": 1})
+    if existing:
+        await assert_period_open(existing.get("created_at"))
     result = await db.bank_journal.delete_one({"id": entry_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Écriture non trouvée")

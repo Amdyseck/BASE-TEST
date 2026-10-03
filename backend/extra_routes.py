@@ -9,7 +9,7 @@ import requests
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Response
 from pydantic import BaseModel
 
-from server import db, get_current_user, require_role, require_module, require_perm, record_cash_movement, add_bank_entry, log_audit
+from server import db, get_current_user, require_role, require_module, require_perm, record_cash_movement, add_bank_entry, log_audit, assert_period_open
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -408,6 +408,7 @@ async def delete_movement(movement_id: str, user: dict = Depends(require_perm("c
         raise HTTPException(status_code=404, detail="Mouvement non trouvé")
     if not movement.get("is_manual"):
         raise HTTPException(status_code=400, detail="Seuls les mouvements manuels peuvent être supprimés")
+    await assert_period_open(movement.get("created_at"))
     await db.cash_movements.delete_one({"id": movement_id})
     await db.bank_journal.delete_many({"related_entity_type": "cash_movement", "related_entity_id": movement_id})
     await log_audit(user, "delete", "cash", "cash_movements", movement_id, movement.get("description", ""), before=movement)

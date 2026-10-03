@@ -10,39 +10,111 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Checkbox } from "../components/ui/checkbox";
 import { toast } from "sonner";
-import { BookOpen, Printer, Link2, Unlink, Wand2 } from "lucide-react";
+import { downloadFile } from "../lib/download";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
+import { BookOpen, Printer, Link2, Unlink, Wand2, FileSpreadsheet, Plus, Trash2, Lock, Unlock } from "lucide-react";
 
 const money = (a) => new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 0 }).format(a || 0);
 const fdate = (d) => new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
 const tabCls = "rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white";
 
-const PeriodBar = ({ start, end, setStart, setEnd, children }) => (
+const PeriodBar = ({ start, end, setStart, setEnd, children, exportUrl, exportName, actions }) => (
   <div className="flex flex-wrap items-end gap-3 no-print">
     <div><Label className="overline">Du</Label><Input type="date" value={start} onChange={(e) => setStart(e.target.value)} className="rounded-sm h-9" data-testid="acc-start" /></div>
     <div><Label className="overline">Au</Label><Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="rounded-sm h-9" data-testid="acc-end" /></div>
     {children}
-    <Button variant="outline" className="rounded-sm h-9 ml-auto" onClick={() => window.print()}><Printer className="w-4 h-4 mr-2" /> Imprimer</Button>
+    <div className="flex gap-2 ml-auto">
+      {actions}
+      {exportUrl && <Button variant="outline" className="rounded-sm h-9 text-green-700" onClick={() => downloadFile(exportUrl, exportName)} data-testid="acc-export-btn"><FileSpreadsheet className="w-4 h-4 mr-2" /> Excel</Button>}
+      <Button variant="outline" className="rounded-sm h-9" onClick={() => window.print()}><Printer className="w-4 h-4 mr-2" /> Imprimer</Button>
+    </div>
   </div>
 );
 
+const emptyLine = () => ({ account: "", aux_id: "", debit: "", credit: "" });
+
+const ManualEntryDialog = ({ open, onOpenChange, plan, onCreated }) => {
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [label, setLabel] = useState("");
+  const [lines, setLines] = useState([emptyLine(), emptyLine()]);
+  const [tiers, setTiers] = useState({ customers: [], suppliers: [] });
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    Promise.all([api.get("/customers"), api.get("/suppliers")]).then(([c, s]) => setTiers({ customers: c.data, suppliers: s.data })).catch(() => {});
+    setLabel(""); setLines([emptyLine(), emptyLine()]); setDate(new Date().toISOString().slice(0, 10));
+  }, [open]);
+  const setLine = (i, p) => setLines(lines.map((l, j) => (j === i ? { ...l, ...p } : l)));
+  const num = (v) => parseFloat(String(v).replace(",", ".")) || 0;
+  const debit = lines.reduce((a, l) => a + num(l.debit), 0), credit = lines.reduce((a, l) => a + num(l.credit), 0);
+  const balanced = debit > 0 && Math.abs(debit - credit) < 0.01;
+  const auxFor = (acc) => (["411", "4191"].includes(acc) ? tiers.customers : ["401", "4091"].includes(acc) ? tiers.suppliers : null);
+  const submit = async () => {
+    setSaving(true);
+    try {
+      const r = await api.post("/accounting/entries", { date, label, lines: lines.filter((l) => l.account).map((l) => ({ account: l.account, aux_id: l.aux_id || null, debit: num(l.debit), credit: num(l.credit) })) });
+      toast.success(`Écriture ${r.data.piece} enregistrée`); onOpenChange(false); onCreated();
+    } catch (e) { toast.error(e.response?.data?.detail || "Erreur lors de l'enregistrement"); } finally { setSaving(false); }
+  };
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl" data-testid="manual-entry-dialog">
+        <DialogHeader><DialogTitle className="font-[Chivo]">Nouvelle écriture — Opérations diverses (OD)</DialogTitle></DialogHeader>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div><Label className="overline">Date</Label><Input type="date" value={date} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setDate(e.target.value)} className="rounded-sm h-9" data-testid="od-date" /></div>
+          <div className="md:col-span-2"><Label className="overline">Libellé</Label><Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Ex. Régularisation, frais bancaires…" className="rounded-sm h-9" data-testid="od-label" /></div>
+        </div>
+        <div className="border border-slate-200 rounded-sm overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-100 text-[11px] uppercase text-slate-500"><tr><th className="text-left px-2 py-2">Compte</th><th className="text-left px-2 py-2 w-48">Tiers</th><th className="text-right px-2 py-2 w-32">Débit</th><th className="text-right px-2 py-2 w-32">Crédit</th><th className="w-8"></th></tr></thead>
+            <tbody>
+              {lines.map((l, i) => { const aux = auxFor(l.account); return (
+                <tr key={i} className="border-t border-slate-100" data-testid={`od-line-${i}`}>
+                  <td className="p-1"><Select value={l.account || "none"} onValueChange={(v) => setLine(i, { account: v === "none" ? "" : v, aux_id: "" })}><SelectTrigger className="h-8 rounded-sm" data-testid={`od-account-${i}`}><SelectValue placeholder="Compte" /></SelectTrigger><SelectContent><SelectItem value="none">— Compte —</SelectItem>{plan.accounts.map((a) => <SelectItem key={a.account} value={a.account}>{a.account} — {a.label}</SelectItem>)}</SelectContent></Select></td>
+                  <td className="p-1">{aux ? <Select value={l.aux_id || "none"} onValueChange={(v) => setLine(i, { aux_id: v === "none" ? "" : v })}><SelectTrigger className="h-8 rounded-sm"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">— Aucun —</SelectItem>{aux.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent></Select> : <span className="text-xs text-slate-400 px-2">—</span>}</td>
+                  <td className="p-1"><Input value={l.debit} onChange={(e) => setLine(i, { debit: e.target.value, credit: e.target.value ? "" : l.credit })} inputMode="decimal" className="h-8 text-right font-mono rounded-sm" data-testid={`od-debit-${i}`} /></td>
+                  <td className="p-1"><Input value={l.credit} onChange={(e) => setLine(i, { credit: e.target.value, debit: e.target.value ? "" : l.debit })} inputMode="decimal" className="h-8 text-right font-mono rounded-sm" data-testid={`od-credit-${i}`} /></td>
+                  <td className="p-1 text-center">{lines.length > 2 && <button type="button" onClick={() => setLines(lines.filter((_, j) => j !== i))} className="text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>}</td>
+                </tr>
+              ); })}
+            </tbody>
+            <tfoot><tr className={`${balanced ? "bg-green-50" : "bg-orange-50"} border-t border-slate-200 font-mono font-bold`}><td colSpan={2} className="px-2 py-2 text-right font-sans">{balanced ? "Équilibrée" : "Débit ≠ Crédit"}</td><td className="px-2 py-2 text-right" data-testid="od-total-debit">{money(debit)}</td><td className="px-2 py-2 text-right" data-testid="od-total-credit">{money(credit)}</td><td></td></tr></tfoot>
+          </table>
+        </div>
+        <div className="flex justify-between">
+          <Button variant="outline" className="rounded-sm" onClick={() => setLines([...lines, emptyLine()])} data-testid="od-add-line"><Plus className="w-4 h-4 mr-2" /> Ligne</Button>
+          <div className="flex gap-2"><Button variant="outline" className="rounded-sm" onClick={() => onOpenChange(false)}>Annuler</Button><Button className="btn-accent" disabled={!balanced || !label.trim() || saving} onClick={submit} data-testid="od-submit">Enregistrer l'écriture</Button></div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 const JournalsTab = ({ start, end, setStart, setEnd, plan }) => {
+  const { isManager } = useAuth();
   const [journal, setJournal] = useState("all");
   const [data, setData] = useState(null);
-  useEffect(() => {
-    api.get(`/accounting/journals?${journal !== "all" ? `journal=${journal}&` : ""}start=${start}&end=${end}`).then((r) => setData(r.data)).catch(() => toast.error("Erreur de chargement du journal"));
-  }, [journal, start, end]);
+  const [odOpen, setOdOpen] = useState(false);
+  const q = `${journal !== "all" ? `journal=${journal}&` : ""}start=${start}&end=${end}`;
+  const load = useCallback(() => { api.get(`/accounting/journals?${q}`).then((r) => setData(r.data)).catch(() => toast.error("Erreur de chargement du journal")); }, [q]);
+  useEffect(() => { load(); }, [load]);
+  const removeManual = async (e) => {
+    if (!window.confirm(`Supprimer l'écriture ${e.piece} ?`)) return;
+    try { await api.delete(`/accounting/entries/${e.source_id}`); toast.success("Écriture supprimée"); load(); } catch (err) { toast.error(err.response?.data?.detail || "Erreur"); }
+  };
   return (
     <div className="space-y-4">
-      <PeriodBar start={start} end={end} setStart={setStart} setEnd={setEnd}>
+      <ManualEntryDialog open={odOpen} onOpenChange={setOdOpen} plan={plan} onCreated={load} />
+      <PeriodBar start={start} end={end} setStart={setStart} setEnd={setEnd} exportUrl={`/accounting/export/journals.xlsx?${q}`} exportName={`journal_${journal}.xlsx`} actions={isManager && <Button className="btn-accent h-9" onClick={() => setOdOpen(true)} data-testid="new-od-btn"><Plus className="w-4 h-4 mr-2" /> Écriture OD</Button>}>
         <div><Label className="overline">Journal</Label>
           <Select value={journal} onValueChange={setJournal}><SelectTrigger className="rounded-sm h-9 w-56" data-testid="journal-select"><SelectValue /></SelectTrigger>
             <SelectContent><SelectItem value="all">Tous les journaux</SelectItem>{plan.journals.map((j) => <SelectItem key={j.code} value={j.code}>{j.code} — {j.label}</SelectItem>)}</SelectContent></Select></div>
       </PeriodBar>
       <Card className="table-container">
         <Table className="data-table">
-          <TableHeader className="table-header"><TableRow><TableHead>Date</TableHead><TableHead>Jnl</TableHead><TableHead>Pièce</TableHead><TableHead>Compte</TableHead><TableHead>Libellé</TableHead><TableHead>Tiers</TableHead><TableHead className="text-right">Débit</TableHead><TableHead className="text-right">Crédit</TableHead></TableRow></TableHeader>
+          <TableHeader className="table-header"><TableRow><TableHead>Date</TableHead><TableHead>Jnl</TableHead><TableHead>Pièce</TableHead><TableHead>Compte</TableHead><TableHead>Libellé</TableHead><TableHead>Tiers</TableHead><TableHead className="text-right">Débit</TableHead><TableHead className="text-right">Crédit</TableHead><TableHead className="no-print"></TableHead></TableRow></TableHeader>
           <TableBody>
-            {!data ? <TableRow><TableCell colSpan={8} className="text-center py-10"><div className="spinner mx-auto" /></TableCell></TableRow>
+            {!data ? <TableRow><TableCell colSpan={9} className="text-center py-10"><div className="spinner mx-auto" /></TableCell></TableRow>
               : data.entries.length === 0 ? <TableRow><TableCell colSpan={8} className="text-center py-10 text-slate-400">Aucune écriture sur la période</TableCell></TableRow>
               : data.entries.map((e) => e.lines.map((l, i) => (
                 <TableRow key={l.line_id} className={`table-row ${i === 0 ? "border-t-2 border-slate-300" : ""}`} data-testid={`journal-line-${l.line_id}`}>
@@ -54,13 +126,66 @@ const JournalsTab = ({ start, end, setStart, setEnd, plan }) => {
                   <TableCell className="text-sm text-slate-600">{l.aux_name}</TableCell>
                   <TableCell className="text-right font-mono">{l.debit ? money(l.debit) : ""}</TableCell>
                   <TableCell className="text-right font-mono">{l.credit ? money(l.credit) : ""}</TableCell>
+                  <TableCell className="no-print w-8">{i === 0 && e.source_type === "manual" && isManager && <button type="button" onClick={() => removeManual(e)} className="text-red-600" title="Supprimer l'écriture" data-testid={`delete-od-${e.source_id}`}><Trash2 className="w-3.5 h-3.5" /></button>}</TableCell>
                 </TableRow>
               )))}
-            {data && <TableRow className="bg-slate-900 text-white font-bold"><TableCell colSpan={6}>TOTAUX — {data.count} écriture{data.count > 1 ? "s" : ""}</TableCell><TableCell className="text-right font-mono" data-testid="journal-total-debit">{money(data.total_debit)}</TableCell><TableCell className="text-right font-mono">{money(data.total_credit)}</TableCell></TableRow>}
+            {data && <TableRow className="bg-slate-900 text-white font-bold"><TableCell colSpan={6}>TOTAUX — {data.count} écriture{data.count > 1 ? "s" : ""}</TableCell><TableCell className="text-right font-mono" data-testid="journal-total-debit">{money(data.total_debit)}</TableCell><TableCell className="text-right font-mono">{money(data.total_credit)}</TableCell><TableCell className="no-print"></TableCell></TableRow>}
           </TableBody>
         </Table>
       </Card>
     </div>
+  );
+};
+
+const LedgerTab = ({ start, end, setStart, setEnd }) => {
+  const [data, setData] = useState(null);
+  useEffect(() => { setData(null); api.get(`/accounting/ledger?start=${start}&end=${end}`).then((r) => setData(r.data)).catch(() => toast.error("Erreur de chargement du grand livre")); }, [start, end]);
+  return (
+    <div className="space-y-4">
+      <PeriodBar start={start} end={end} setStart={setStart} setEnd={setEnd} exportUrl={`/accounting/export/ledger.xlsx?start=${start}&end=${end}`} exportName="grand_livre.xlsx" />
+      {!data ? <div className="flex justify-center py-10"><div className="spinner" /></div> : data.accounts.map((a) => (
+        <Card key={a.account} className="table-container" data-testid={`ledger-account-${a.account}`}>
+          <div className="flex items-center justify-between px-4 py-2 bg-slate-900 text-white"><span className="font-mono font-bold">{a.account} <span className="font-sans font-medium">{a.label}</span></span><span className="text-xs">Report <span className="font-mono">{money(a.opening)}</span> · Débit <span className="font-mono">{money(a.debit)}</span> · Crédit <span className="font-mono">{money(a.credit)}</span> · Solde <span className="font-mono font-bold">{money(a.balance)}</span></span></div>
+          <Table className="data-table">
+            <TableHeader className="table-header"><TableRow><TableHead>Date</TableHead><TableHead>Jnl</TableHead><TableHead>Pièce</TableHead><TableHead>Libellé</TableHead><TableHead>Tiers</TableHead><TableHead className="text-right">Débit</TableHead><TableHead className="text-right">Crédit</TableHead><TableHead className="text-right">Solde</TableHead><TableHead className="text-center">Let.</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {a.lines.map((l) => (
+                <TableRow key={l.line_id} className="table-row">
+                  <TableCell className="text-slate-500 whitespace-nowrap">{fdate(l.date)}</TableCell><TableCell className="font-mono text-xs">{l.journal}</TableCell><TableCell className="font-mono text-xs">{l.piece}</TableCell><TableCell className="text-sm">{l.label}</TableCell><TableCell className="text-sm text-slate-600">{l.aux_name}</TableCell>
+                  <TableCell className="text-right font-mono">{l.debit ? money(l.debit) : ""}</TableCell><TableCell className="text-right font-mono">{l.credit ? money(l.credit) : ""}</TableCell><TableCell className={`text-right font-mono ${l.balance < 0 ? "text-red-600" : ""}`}>{money(l.balance)}</TableCell><TableCell className="text-center font-mono text-xs text-blue-700">{l.lettre || ""}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      ))}
+      {data && <div className="bg-slate-900 text-white p-3 rounded-sm flex justify-between font-bold"><span>TOTAL GÉNÉRAL</span><span className="font-mono" data-testid="ledger-total">Débit {money(data.totals.debit)} · Crédit {money(data.totals.credit)}</span></div>}
+    </div>
+  );
+};
+
+const ClosingTab = ({ closing, reload }) => {
+  const { isAdmin } = useAuth();
+  const [date, setDate] = useState(closing?.closed_until || "");
+  const apply = async (value) => {
+    try { await api.put("/accounting/closing", { closed_until: value }); toast.success(value ? `Période clôturée jusqu'au ${fdate(value)}` : "Période rouverte"); reload(); }
+    catch (e) { toast.error(e.response?.data?.detail || "Erreur"); }
+  };
+  return (
+    <Card className="p-6 max-w-2xl space-y-4" data-testid="closing-card">
+      <div className={`p-4 rounded-sm border ${closing?.closed_until ? "bg-red-50 border-red-200 text-red-900" : "bg-green-50 border-green-200 text-green-900"}`} data-testid="closing-status">
+        <p className="font-bold flex items-center gap-2">{closing?.closed_until ? <><Lock className="w-4 h-4" /> Période clôturée jusqu'au {fdate(closing.closed_until)}</> : <><Unlock className="w-4 h-4" /> Aucune période clôturée</>}</p>
+        <p className="text-xs mt-1">{closing?.closed_until ? `Par ${closing.updated_by} le ${fdate(closing.updated_at)}. Toute facture, règlement, mouvement de caisse/banque ou écriture daté(e) au plus tard à cette date ne peut plus être créé(e), modifié(e) ou annulé(e).` : "Les factures, règlements et écritures peuvent être modifiés sur toutes les dates."}</p>
+      </div>
+      {isAdmin ? (
+        <div className="flex flex-wrap items-end gap-3">
+          <div><Label className="overline">Clôturer jusqu'au (inclus)</Label><Input type="date" value={date} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setDate(e.target.value)} className="rounded-sm h-9" data-testid="closing-date" /></div>
+          <Button className="btn-accent h-9" disabled={!date} onClick={() => window.confirm(`Clôturer toutes les opérations jusqu'au ${fdate(date)} ?`) && apply(date)} data-testid="close-period-btn"><Lock className="w-4 h-4 mr-2" /> Clôturer</Button>
+          {closing?.closed_until && <Button variant="outline" className="rounded-sm h-9 text-red-700" onClick={() => window.confirm("Rouvrir la période clôturée ?") && apply(null)} data-testid="reopen-period-btn"><Unlock className="w-4 h-4 mr-2" /> Rouvrir</Button>}
+        </div>
+      ) : <p className="text-sm text-slate-500">Seul l'administrateur peut clôturer ou rouvrir une période.</p>}
+      <p className="text-xs text-slate-500">Conseil : clôturez chaque mois une fois le journal de caisse contrôlé et la balance vérifiée (clôture mensuelle).</p>
+    </Card>
   );
 };
 
@@ -156,7 +281,7 @@ const BalanceTab = ({ start, end, setStart, setEnd }) => {
   useEffect(() => { api.get(`/accounting/balance?start=${start}&end=${end}`).then((r) => setData(r.data)).catch(() => toast.error("Erreur de chargement de la balance")); }, [start, end]);
   return (
     <div className="space-y-4">
-      <PeriodBar start={start} end={end} setStart={setStart} setEnd={setEnd} />
+      <PeriodBar start={start} end={end} setStart={setStart} setEnd={setEnd} exportUrl={`/accounting/export/balance.xlsx?start=${start}&end=${end}`} exportName="balance.xlsx" />
       <Card className="table-container">
         <Table className="data-table">
           <TableHeader className="table-header"><TableRow><TableHead>Compte</TableHead><TableHead>Intitulé</TableHead><TableHead className="text-right">Total débit</TableHead><TableHead className="text-right">Total crédit</TableHead><TableHead className="text-right">Solde débiteur</TableHead><TableHead className="text-right">Solde créditeur</TableHead></TableRow></TableHeader>
@@ -181,22 +306,29 @@ const AccountingPage = () => {
   const today = new Date();
   const [start, setStart] = useState(`${today.getFullYear()}-01-01`);
   const [end, setEnd] = useState(today.toISOString().slice(0, 10));
-  useEffect(() => { api.get("/accounting/plan").then((r) => setPlan(r.data)).catch(() => toast.error("Erreur de chargement du plan comptable")); }, []);
+  const [closing, setClosing] = useState(null);
+  const loadClosing = useCallback(() => api.get("/accounting/closing").then((r) => setClosing(r.data)).catch(() => {}), []);
+  useEffect(() => { api.get("/accounting/plan").then((r) => setPlan(r.data)).catch(() => toast.error("Erreur de chargement du plan comptable")); loadClosing(); }, [loadClosing]);
   if (!plan) return <div className="flex items-center justify-center h-64"><div className="spinner" /></div>;
   const period = { start, end, setStart, setEnd, plan };
   return (
     <div className="space-y-6" data-testid="accounting-page">
       <div>
         <h1 className="text-2xl font-bold font-[Chivo] tracking-tight text-slate-900 flex items-center gap-2"><BookOpen className="w-6 h-6" /> Comptabilité SYSCOHADA</h1>
-        <p className="text-slate-500 mt-1">Écritures générées automatiquement à partir des ventes, achats, règlements, caisse, banque et retours — journaux, interrogation et lettrage des comptes, balance</p>
+        <p className="text-slate-500 mt-1">Écritures générées automatiquement à partir des ventes, achats, règlements, caisse, banque et retours — journaux, interrogation et lettrage des comptes, grand livre, balance</p>
+        {closing?.closed_until && <span className="inline-flex items-center gap-1 mt-2 px-2 py-1 bg-red-100 text-red-800 text-xs rounded-sm font-medium" data-testid="closing-badge"><Lock className="w-3 h-3" /> Période clôturée jusqu'au {fdate(closing.closed_until)}</span>}
       </div>
       <Tabs defaultValue="journals">
         <TabsList className="bg-slate-100 rounded-sm no-print">
           <TabsTrigger value="journals" className={tabCls} data-testid="tab-journals">Journaux</TabsTrigger>
           <TabsTrigger value="account" className={tabCls} data-testid="tab-account">Interrogation & lettrage</TabsTrigger>
+          <TabsTrigger value="ledger" className={tabCls} data-testid="tab-ledger">Grand livre</TabsTrigger>
           <TabsTrigger value="balance" className={tabCls} data-testid="tab-balance">Balance</TabsTrigger>
           <TabsTrigger value="plan" className={tabCls} data-testid="tab-plan">Plan comptable</TabsTrigger>
+          <TabsTrigger value="closing" className={tabCls} data-testid="tab-closing">Clôture</TabsTrigger>
         </TabsList>
+        <TabsContent value="ledger" className="mt-4"><LedgerTab {...period} /></TabsContent>
+        <TabsContent value="closing" className="mt-4"><ClosingTab closing={closing} reload={loadClosing} /></TabsContent>
         <TabsContent value="journals" className="mt-4"><JournalsTab {...period} /></TabsContent>
         <TabsContent value="account" className="mt-4"><AccountTab {...period} /></TabsContent>
         <TabsContent value="balance" className="mt-4"><BalanceTab {...period} /></TabsContent>

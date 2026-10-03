@@ -5,7 +5,7 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
-from server import db, get_current_user, require_module, require_perm, effective_permissions, record_cash_movement, log_audit, next_sequence, parse_invoice_date, SaleItem, Payment
+from server import db, get_current_user, require_module, require_perm, effective_permissions, record_cash_movement, log_audit, next_sequence, parse_invoice_date, assert_period_open, SaleItem, Payment
 
 router = APIRouter()
 
@@ -35,6 +35,9 @@ async def edit_sale(sale_id: str, data: SaleEdit, user: dict = Depends(require_p
         raise HTTPException(status_code=400, detail="Impossible de modifier une facture annulée")
     if sale.get("status") == "returned" or sale.get("returns_total", 0) > 0:
         raise HTTPException(status_code=400, detail="Impossible de modifier une facture ayant fait l'objet d'un retour")
+    await assert_period_open(sale.get("created_at"))
+    if data.invoice_date:
+        await assert_period_open(data.invoice_date)
     if not data.items:
         raise HTTPException(status_code=400, detail="La facture ne contient aucun article")
     perms = effective_permissions(user)

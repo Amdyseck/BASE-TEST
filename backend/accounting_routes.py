@@ -1,10 +1,13 @@
+import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
-from server import db, require_module, require_role, log_audit
+from server import db, require_module, require_role, log_audit, next_sequence, assert_period_open
+from extra_routes import load_settings
+from export_routes import build_workbook
 
 router = APIRouter()
 
@@ -158,6 +161,9 @@ async def build_entries() -> List[dict]:
             adv_lines = [{"account": "411", "debit": amt, **aux}, {"account": "4191", "credit": amt, **aux}] if is_c else [{"account": "4091", "debit": amt, **aux}, {"account": "401", "credit": amt, **aux}]
             entries.append(_entry(f"ret:{r['id']}:adv", r["created_at"], "OD", r["number"], f"Avoir conservé en avance — {aux['aux_name']}", adv_lines, "return", r["id"]))
 
+    for me in await db.manual_entries.find({}, {"_id": 0}).to_list(50000):
+        entries.append(_entry(f"manual:{me['id']}", me["date"], "OD", me["piece"], me["label"], me["lines"], "manual", me["id"]))
+
     entries.sort(key=lambda e: e["date"])
     return entries
 
@@ -297,3 +303,177 @@ async def delete_lettrage(account: str, code: str, user: dict = Depends(require_
         raise HTTPException(status_code=404, detail="Lettrage introuvable")
     await log_audit(user, "delete", "accounts", "lettrage", f"{account}:{code}", f"Délettrage {account} {code}")
     return {"message": "Lettrage supprimé"}
+
+
+# ==================== ÉCRITURES MANUELLES (OD) ====================
+
+class ManualLine(BaseModel):
+    account: str
+    aux_id: Optional[str] = None
+    aux_name: Optional[str] = ""
+    debit: float = 0
+    credit: float = 0
+
+
+class ManualEntryCreate(BaseModel):
+    date: str  # YYYY-MM-DD
+    label: str
+    lines: List[ManualLine]
+
+
+@router.post("/accounting/entries")
+async def create_manual_entry(data: ManualEntryCreate, user: dict = Depends(require_role(["admin", "gerant"]))):
+    if not data.label.strip():
+        raise HTTPException(status_code=400, detail="Libellé obligatoire")
+    try:
+        datetime.strptime(data.date[:10], "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Date invalide")
+    if data.date[:10] > datetime.now(timezone.utc).date().isoformat():
+        raise HTTPException(status_code=400, detail="La date ne peut pas être dans le futur")
+    await assert_period_open(data.date)
+    lines = [l for l in data.lines if l.debit > 0 or l.credit > 0]
+    if len(lines) < 2:
+        raise HTTPException(status_code=400, detail="Une écriture comporte au moins deux lignes")
+    for l in lines:
+        if l.account not in ACCOUNTS:
+            raise HTTPException(status_code=400, detail=f"Compte {l.account} inconnu")
+        if l.debit > 0 and l.credit > 0:
+            raise HTTPException(status_code=400, detail="Une ligne est soit au débit, soit au crédit")
+        if l.aux_id:
+            coll = db.customers if l.account in ("411", "4191") else db.suppliers if l.account in ("401", "4091") else None
+            tiers = await coll.find_one({"id": l.aux_id}, {"_id": 0, "name": 1}) if coll is not None else None
+            if not tiers:
+                raise HTTPException(status_code=400, detail="Tiers invalide pour ce compte")
+            l.aux_name = tiers["name"]
+    debit, credit = round(sum(l.debit for l in lines), 2), round(sum(l.credit for l in lines), 2)
+    if abs(debit - credit) > 0.01:
+        raise HTTPException(status_code=400, detail=f"Écriture déséquilibrée : débit {debit:g} ≠ crédit {credit:g}")
+    now = datetime.now(timezone.utc)
+    doc = {
+        "id": str(uuid.uuid4()),
+        "piece": f"OD{str(await next_sequence('manual_entry')).zfill(7)}",
+        "date": datetime.combine(datetime.strptime(data.date[:10], "%Y-%m-%d").date(), now.time(), tzinfo=timezone.utc).isoformat(),
+        "label": data.label.strip(),
+        "lines": [l.model_dump() for l in lines],
+        "total": debit,
+        "created_by": user["name"],
+        "created_at": now.isoformat(),
+    }
+    await db.manual_entries.insert_one(doc)
+    doc.pop("_id", None)
+    await log_audit(user, "create", "accounts", "manual_entries", doc["id"], doc["piece"], after={"libelle": doc["label"], "montant": debit, "lignes": len(lines)})
+    return doc
+
+
+@router.delete("/accounting/entries/{entry_id}")
+async def delete_manual_entry(entry_id: str, user: dict = Depends(require_role(["admin", "gerant"]))):
+    doc = await db.manual_entries.find_one({"id": entry_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Écriture introuvable")
+    await assert_period_open(doc["date"])
+    line_ids = [f"manual:{entry_id}#{i}" for i in range(len(doc["lines"]))]
+    if await db.lettrage.find_one({"line_ids": {"$in": line_ids}}):
+        raise HTTPException(status_code=400, detail="Écriture lettrée : délettrez d'abord")
+    await db.manual_entries.delete_one({"id": entry_id})
+    await log_audit(user, "delete", "accounts", "manual_entries", entry_id, doc["piece"], before={"libelle": doc["label"], "montant": doc["total"]})
+    return {"message": "Écriture supprimée"}
+
+
+# ==================== GRAND LIVRE GÉNÉRAL ====================
+
+async def build_ledger(start: Optional[str], end: Optional[str]) -> dict:
+    letters = await _letter_map()
+    accounts = {}
+    for e in await build_entries():
+        for l in e["lines"]:
+            a = accounts.setdefault(l["account"], {"account": l["account"], "label": ACCOUNTS.get(l["account"], ""), "opening": 0.0, "lines": [], "debit": 0.0, "credit": 0.0})
+            if start and e["date"][:10] < start[:10]:
+                a["opening"] = round(a["opening"] + l["debit"] - l["credit"], 2)
+                continue
+            if end and e["date"][:10] > end[:10]:
+                continue
+            a["lines"].append({**l, "date": e["date"], "journal": e["journal"], "piece": e["piece"], "label": e["label"], "lettre": letters.get(l["line_id"])})
+            a["debit"] = round(a["debit"] + l["debit"], 2)
+            a["credit"] = round(a["credit"] + l["credit"], 2)
+    out = []
+    for a in sorted(accounts.values(), key=lambda x: x["account"]):
+        running = a["opening"]
+        for l in a["lines"]:
+            running = round(running + l["debit"] - l["credit"], 2)
+            l["balance"] = running
+        a["balance"] = running
+        out.append(a)
+    return {"accounts": out, "totals": {"debit": round(sum(a["debit"] for a in out), 2), "credit": round(sum(a["credit"] for a in out), 2)}}
+
+
+@router.get("/accounting/ledger")
+async def general_ledger(start: Optional[str] = None, end: Optional[str] = None, user: dict = Depends(require_module("accounts"))):
+    return await build_ledger(start, end)
+
+
+# ==================== CLÔTURE DE PÉRIODE ====================
+
+class ClosingUpdate(BaseModel):
+    closed_until: Optional[str] = None  # YYYY-MM-DD ; None = réouverture
+
+
+@router.get("/accounting/closing")
+async def get_closing(user: dict = Depends(require_module("accounts"))):
+    doc = await db.settings.find_one({"key": "closing"}, {"_id": 0, "key": 0})
+    return doc or {"closed_until": None}
+
+
+@router.put("/accounting/closing")
+async def update_closing(data: ClosingUpdate, user: dict = Depends(require_role(["admin"]))):
+    if data.closed_until:
+        try:
+            datetime.strptime(data.closed_until[:10], "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Date invalide")
+        if data.closed_until[:10] > datetime.now(timezone.utc).date().isoformat():
+            raise HTTPException(status_code=400, detail="Impossible de clôturer une période future")
+    doc = {"closed_until": data.closed_until[:10] if data.closed_until else None, "updated_by": user["name"], "updated_at": datetime.now(timezone.utc).isoformat()}
+    await db.settings.update_one({"key": "closing"}, {"$set": doc}, upsert=True)
+    await log_audit(user, "update", "accounts", "settings", "closing", "Clôture de période", after={"cloture_jusqu_au": doc["closed_until"] or "réouverte"})
+    return doc
+
+
+# ==================== EXPORTS EXCEL ====================
+
+def _fr(d: str) -> str:
+    return f"{d[8:10]}/{d[5:7]}/{d[:4]}" if d else ""
+
+
+def _period_label(start, end):
+    return f"du {_fr(start)} au {_fr(end)}" if start or end else "toutes périodes"
+
+
+@router.get("/accounting/export/journals.xlsx")
+async def export_journals(journal: Optional[str] = None, start: Optional[str] = None, end: Optional[str] = None, user: dict = Depends(require_module("accounts"))):
+    data = await journals(journal, start, end, user)
+    rows = [[_fr(e["date"][:10]), e["journal"], e["piece"], l["account"], l["account_label"], e["label"], l["aux_name"], l["debit"] or "", l["credit"] or ""] for e in data["entries"] for l in e["lines"]]
+    rows.append(["", "", "", "", "", "TOTAUX", "", data["total_debit"], data["total_credit"]])
+    title = f"Journal {journal}" if journal else "Tous les journaux"
+    return build_workbook(title, ["Date", "Journal", "Pièce", "Compte", "Intitulé", "Libellé", "Tiers", "Débit", "Crédit"], rows, (await load_settings())["name"], _period_label(start, end))
+
+
+@router.get("/accounting/export/balance.xlsx")
+async def export_balance(start: Optional[str] = None, end: Optional[str] = None, user: dict = Depends(require_module("accounts"))):
+    data = await balance(start, end, user)
+    rows = [[r["account"], r["label"], r["debit"], r["credit"], r["solde_debiteur"] or "", r["solde_crediteur"] or ""] for r in data["rows"]]
+    t = data["totals"]
+    rows.append(["", "TOTAUX", t["debit"], t["credit"], t["solde_debiteur"], t["solde_crediteur"]])
+    return build_workbook("Balance", ["Compte", "Intitulé", "Total débit", "Total crédit", "Solde débiteur", "Solde créditeur"], rows, (await load_settings())["name"], _period_label(start, end))
+
+
+@router.get("/accounting/export/ledger.xlsx")
+async def export_ledger(start: Optional[str] = None, end: Optional[str] = None, user: dict = Depends(require_module("accounts"))):
+    data = await build_ledger(start, end)
+    rows = []
+    for a in data["accounts"]:
+        rows.append([a["account"], a["label"], "", "", "Report", "", "", "", a["opening"], ""])
+        for l in a["lines"]:
+            rows.append(["", "", _fr(l["date"][:10]), l["journal"], l["piece"], l["label"], l["aux_name"], l["debit"] or "", l["credit"] or "", l["balance"], l["lettre"] or ""])
+        rows.append(["", f"Total {a['account']}", "", "", "", "", "", a["debit"], a["credit"], a["balance"], ""])
+    return build_workbook("Grand livre", ["Compte", "Intitulé", "Date", "Jnl", "Pièce", "Libellé", "Tiers", "Débit", "Crédit", "Solde", "Lettre"], rows, (await load_settings())["name"], _period_label(start, end))
