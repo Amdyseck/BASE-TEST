@@ -15,7 +15,13 @@ export const DEFAULT_INVOICE_UI = {
     payment: "Mode de règlement", discount: "Remise (XOF)", amountPaid: "Montant reçu (XOF)", total: "TOTAL", subtotal: "Sous-total", balanceDue: "Reste à payer",
     picker: "Saisir un article (nom, référence ou code-barres) — Entrée pour ajouter, Tab pour aller à la liste…", articles: "Articles", title: "FACTURE CLIENT",
   },
-  format: { fontSize: "sm", dateFormat: "short", decimals: 0, currency: true, invoiceBg: "slate" },
+  format: { fontSize: "sm", dateFormat: "short", decimals: 0, currency: true, invoiceBg: "slate", density: "compact" },
+};
+
+export const DENSITY = {
+  compact: { name: "Compact", cell: "py-0.5", input: "h-7", head: "py-1", pickerRow: "py-1" },
+  normal: { name: "Normal", cell: "py-1.5", input: "h-8", head: "py-2", pickerRow: "py-2" },
+  large: { name: "Aéré", cell: "py-3", input: "h-9", head: "py-3", pickerRow: "py-3" },
 };
 
 export const FIELD_NAMES = { customer: "Client", date: "Date", po_ref: "N° bon de commande" };

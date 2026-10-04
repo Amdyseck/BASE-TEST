@@ -7,7 +7,7 @@ import { Switch } from "./ui/switch";
 import { Slider } from "./ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { ChevronUp, ChevronDown, Save, RotateCcw, Columns3, PanelLeft, Type, Rows3 } from "lucide-react";
-import { FIELD_NAMES, BUTTON_NAMES, BG_NAMES } from "../lib/invoiceUi";
+import { FIELD_NAMES, BUTTON_NAMES, BG_NAMES, DENSITY } from "../lib/invoiceUi";
 
 const Section = ({ icon: Icon, title, children }) => (
   <div className="space-y-3 border border-slate-200 rounded-sm p-3 bg-white">
@@ -111,6 +111,12 @@ export const InvoiceUiCustomizer = ({ open, onOpenChange, ui, update, onSave, on
               <Select value={ui.format.fontSize} onValueChange={(v) => setFormat({ fontSize: v })}>
                 <SelectTrigger className="h-8 w-32 rounded-sm" data-testid="ui-font-size"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="xs">Petite</SelectItem><SelectItem value="sm">Normale</SelectItem><SelectItem value="base">Grande</SelectItem></SelectContent>
+              </Select>
+            </Row>
+            <Row label="Espacement des lignes">
+              <Select value={ui.format.density || "compact"} onValueChange={(v) => setFormat({ density: v })}>
+                <SelectTrigger className="h-8 w-32 rounded-sm" data-testid="ui-density"><SelectValue /></SelectTrigger>
+                <SelectContent>{Object.entries(DENSITY).map(([k, v]) => <SelectItem key={k} value={k}>{v.name}</SelectItem>)}</SelectContent>
               </Select>
             </Row>
             <Row label="Format de date">

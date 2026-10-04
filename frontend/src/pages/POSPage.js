@@ -15,7 +15,7 @@ import { ProductThumb } from "../components/Attachments";
 import { ProductPicker } from "../components/ProductPicker";
 import { InvoiceUiCustomizer } from "../components/InvoiceUiCustomizer";
 import { useInvoiceUi } from "../hooks/useInvoiceUi";
-import { makeMoney, makeDate, FONT_CLASSES, BG_CLASSES } from "../lib/invoiceUi";
+import { makeMoney, makeDate, FONT_CLASSES, BG_CLASSES, DENSITY } from "../lib/invoiceUi";
 
 const formatCurrency = (amount) =>
   new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", minimumFractionDigits: 0 }).format(amount || 0);
@@ -314,35 +314,36 @@ const POSPage = () => {
   const visibleCols = ui.columns.filter((c) => c.visible);
   const fontClass = FONT_CLASSES[ui.format.fontSize] || "text-sm";
   const bgClass = BG_CLASSES[ui.format.invoiceBg] || BG_CLASSES.slate;
+  const dz = DENSITY[ui.format.density] || DENSITY.compact;
   const panelLeft = ui.panel.side === "left";
 
   const renderCell = (col, item, idx) => {
     switch (col.key) {
-      case "index": return <td key="index" className="px-3 py-1.5 text-slate-400 font-mono text-xs">{idx + 1}</td>;
+      case "index": return <td key="index" className={`px-3 ${dz.cell} text-slate-400 font-mono text-xs`}>{idx + 1}</td>;
       case "article": return (
-        <td key="article" className="px-3 py-1.5">
+        <td key="article" className={`px-3 ${dz.cell}`}>
           <p className="font-medium text-slate-900 leading-tight">{item.product_name}</p>
-          <p className="text-[11px] text-slate-400 font-mono">{item.sku} · stock {item.max_stock}</p>
+          {ui.format.density !== "compact" && <p className="text-[11px] text-slate-400 font-mono">{item.sku} · stock {item.max_stock}</p>}
         </td>
       );
-      case "unit": return <td key="unit" className="px-2 py-1.5 text-slate-600 text-xs">{item.unit || "—"}</td>;
+      case "unit": return <td key="unit" className={`px-2 ${dz.cell} text-slate-600 text-xs`}>{item.unit || "—"}</td>;
       case "qty": return (
-        <td key="qty" className="px-2 py-1.5">
+        <td key="qty" className={`px-2 ${dz.cell}`}>
           <Input ref={(el) => { qtyRefs.current[item.product_id] = el; }} type="text" inputMode="decimal" value={item.qty_raw} onChange={(e) => onQtyChange(item, e.target.value)} onBlur={() => normalize(item)} onFocus={(e) => e.target.select()}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (canEditPrices && visibleCols.some((c) => c.key === "price")) setFocusTarget({ id: item.product_id, field: "price" }); else setFocusTarget({ field: "picker" }); } }}
-            className="w-full h-8 text-center font-mono rounded-sm px-1" title="Quantité (décimales acceptées : 0,5 ; 1,5…)" data-testid={`qty-input-${item.product_id}`} />
+            className={`w-full ${dz.input} text-center font-mono rounded-sm px-1`} title="Quantité (décimales acceptées : 0,5 ; 1,5…)" data-testid={`qty-input-${item.product_id}`} />
         </td>
       );
       case "price": return (
-        <td key="price" className="px-2 py-1.5 text-right">
+        <td key="price" className={`px-2 ${dz.cell} text-right`}>
           {canEditPrices ? (
             <Input ref={(el) => { priceRefs.current[item.product_id] = el; }} type="text" inputMode="decimal" value={item.price_raw} onChange={(e) => onPriceChange(item, e.target.value)} onBlur={() => normalize(item)} onFocus={(e) => e.target.select()}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setFocusTarget({ field: "picker" }); } }}
-              className={`w-full h-8 text-right font-mono rounded-sm px-1 ${item.unit_price !== item.base_price ? "border-orange-400" : ""}`} data-testid={`price-input-${item.product_id}`} />
+              className={`w-full ${dz.input} text-right font-mono rounded-sm px-1 ${item.unit_price !== item.base_price ? "border-orange-400" : ""}`} data-testid={`price-input-${item.product_id}`} />
           ) : <span className="font-mono">{money(item.unit_price)}</span>}
         </td>
       );
-      case "total": return <td key="total" className="px-3 py-1.5 text-right font-mono font-medium text-slate-900">{money(item.total)}</td>;
+      case "total": return <td key="total" className={`px-3 ${dz.cell} text-right font-mono font-medium text-slate-900`}>{money(item.total)}</td>;
       default: return null;
     }
   };
@@ -410,7 +411,7 @@ const POSPage = () => {
             <table className={`w-full ${fontClass}`} data-testid="invoice-lines-table">
               <thead className="bg-slate-200 text-[11px] uppercase tracking-wide text-slate-600 sticky top-0">
                 <tr>
-                  {visibleCols.map((c) => <th key={c.key} className={`px-3 py-2 font-medium ${c.key === "qty" ? "text-center" : ["price", "total"].includes(c.key) ? "text-right" : "text-left"}`} style={c.width ? { width: c.width } : undefined} data-testid={`col-${c.key}`}>{c.label}</th>)}
+                  {visibleCols.map((c) => <th key={c.key} className={`px-3 ${dz.head} font-medium ${c.key === "qty" ? "text-center" : ["price", "total"].includes(c.key) ? "text-right" : "text-left"}`} style={c.width ? { width: c.width } : undefined} data-testid={`col-${c.key}`}>{c.label}</th>)}
                   <th className="w-10"></th>
                 </tr>
               </thead>
@@ -418,13 +419,13 @@ const POSPage = () => {
                 {cart.map((item, idx) => (
                   <tr key={item.product_id} className="border-b border-slate-100 hover:bg-slate-50/60" data-testid={`invoice-line-${item.product_id}`}>
                     {visibleCols.map((c) => renderCell(c, item, idx))}
-                    <td className="px-2 py-1.5 text-right">
-                      <Button variant="ghost" size="sm" tabIndex={-1} onClick={() => removeFromCart(item.product_id)} className="w-7 h-7 p-0 text-red-600" data-testid={`remove-item-${item.product_id}`}><Trash2 className="w-3.5 h-3.5" /></Button>
+                    <td className={`px-2 ${dz.cell} text-right`}>
+                      <Button variant="ghost" size="sm" tabIndex={-1} onClick={() => removeFromCart(item.product_id)} className="w-6 h-6 p-0 text-red-600" data-testid={`remove-item-${item.product_id}`}><Trash2 className="w-3.5 h-3.5" /></Button>
                     </td>
                   </tr>
                 ))}
                 <tr className="bg-green-50 sticky bottom-0 border-t border-green-200">
-                  <td colSpan={visibleCols.length + 1} className="px-3 py-2">
+                  <td colSpan={visibleCols.length + 1} className={`px-3 ${dz.pickerRow}`}>
                     <ProductPicker ref={pickerRef} products={products} value={searchTerm} onChange={setSearchTerm} onPick={(p) => addToCart(p, true)} onTab={focusList} placeholder={L.picker} />
                   </td>
                 </tr>
